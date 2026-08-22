@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix: Remix: 3D Combat Simulator",
+  "description": "A 3D physics-based fighting game built with React, Three.js, and Rapier3D.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
