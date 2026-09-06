@@ -69,14 +69,35 @@ main();
     if (!heroName || typeof heroName !== "string") {
       return res.status(400).json({ error: "Missing or invalid heroName in request body." });
     }
+
     try {
-      const systemInstruction = `You are the Lead Full-Stack Game Architect for "M+ : Hero Simulator", an open-world RPG. Your goal is to parse a requested superhero or custom hero character name, and generate a fully customized 3D character profile.
-Generate visual configs, physics parameters, and deep RPG profiling including:
-- Alignment (Hero, Villain, Anti-Hero, Vigilante, Mercenary).
-- Power loadout (Ranged/Melee/Locomotion/Passive) with energy costs.
-- Fighting Style (choose from 50+ martial arts like Drunken Master, Jeet Kune Do, Kung Fu, Pro Wrestling, Muay Thai, Boxing, Capoeira, etc).
-Return valid JSON matching the schema precisely.`;
+      const systemInstruction = `You are an expert game designer, superhero comic enthusiast, and 3D modeller. 
+Your goal is to parse a requested superhero or custom hero character name, and generate a fully customized 3D character template configuration for a physics-based active-ragdoll fighting game.
+You must creatively translate their iconic comic appearances, color schemes, cape styles, and signature physical superpowers into precise gameplay parameters, 3D mesh styles, and Three.js colors.
+
+Instructions for visual color configurations:
+- All colors MUST be hex strings starting with '0x' followed by 6 hex digits, e.g., '0xd32f2f' for red, '0x212121' for black.
+- Batman style should be dark grey/black ('0x222222', '0x111111').
+- Spiderman style should be red/blue ('0xd32f2f', '0x1976d2').
+- Superman style should be royal blue/bright red ('0x1565c0', '0xd32f2f').
+- Hulk style should be green/purple ('0x2e7d32', '0x7b1fa2').
+- Wolverine style should be bright yellow/royal blue ('0xfdd835', '0x1565c0') or brown/tan.
+- Choose primaryColor, accentColor, headColor, gloveColor, and feetColor carefully to represent the hero's actual design.
+- Define if they have a Cape (hasCape: true) and pointed cowl ears/horns (hasCowlEars: true).
+- Choose the closest chest logo emblem from: 'bat', 'spider', 's-shield', 'star', 'lightning', 'none'.
+
+Instructions for powers and physics:
+- stats.maxHealth should be between 800 and 1800 (Hulk higher, Flash lower).
+- stats.stamina should be between 80 and 150 (energy recovery pool).
+- stats.speed should be between 0.8 and 1.6 (Flash/Spiderman high, Hulk slow but heavy).
+- stats.gravity should be between 0.4 and 1.2 (lower gravity enables floaty super-jumps or hover, higher gravity represents immense density).
+- power.type MUST be one of: 'projectile' (fires a custom projectile like Batarang, shield, star), 'pull' (shoots web lines/grapple to drag opponent close), 'beam' (eyes or chest fires laser beam), 'blast' (earthquake slam/ground smash/force blast), 'dash' (speed blitz punch).
+- power.damage should be between 100 and 300.
+- power.cooldown should be between 1000 and 4000 milliseconds.
+- power.soundPitch should be between 200 and 1200 Hz representing synthesized sfx frequency.`;
+
       const userPrompt = `Generate a 3D superhero template for: "${heroName}"`;
+
       const response = await ai.models.generateContent({
         model: "gemini-3.7-flash",
         contents: userPrompt,
@@ -86,10 +107,9 @@ Return valid JSON matching the schema precisely.`;
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              id: { type: Type.STRING },
-              name: { type: Type.STRING },
-              description: { type: Type.STRING },
-              alignment: { type: Type.STRING, description: "Hero, Villain, Anti-Hero, Vigilante, Mercenary" },
+              id: { type: Type.STRING, description: "A unique slug, e.g., 'superman'" },
+              name: { type: Type.STRING, description: "The clean name of the hero" },
+              description: { type: Type.STRING, description: "A highly concise 1-sentence comic summary" },
               primaryColor: { type: Type.STRING },
               accentColor: { type: Type.STRING },
               headColor: { type: Type.STRING },
@@ -98,71 +118,57 @@ Return valid JSON matching the schema precisely.`;
               hasCape: { type: Type.BOOLEAN },
               capeColor: { type: Type.STRING },
               hasCowlEars: { type: Type.BOOLEAN },
-              chestLogo: { type: Type.STRING },
-              emblemColor: { type: Type.STRING },
-              equipmentSlots: {
-                type: Type.OBJECT,
-                properties: {
-                  head: { type: Type.STRING, description: "Search query or keyword for mask/helmet from CC0 library (e.g., 'cowl', 'visor', 'none')" },
-                  back: { type: Type.STRING, description: "Search query or keyword for back accessory (e.g., 'cape', 'jetpack', 'wings', 'none')" },
-                  chest: { type: Type.STRING, description: "Search query or keyword for chest accessory (e.g., 'armor plate', 'logo', 'none')" },
-                  weapon: { type: Type.STRING, description: "Search query or keyword for held weapon (e.g., 'sword', 'staff', 'none')" }
-                },
-                required: ["head", "back", "chest", "weapon"]
+              chestLogo: { 
+                type: Type.STRING, 
+                description: "Must be: 'bat', 'spider', 's-shield', 'star', 'lightning', 'none'" 
               },
+              emblemColor: { type: Type.STRING },
               stats: {
                 type: Type.OBJECT,
-                properties: { maxHealth: { type: Type.INTEGER }, stamina: { type: Type.INTEGER }, speed: { type: Type.NUMBER }, gravity: { type: Type.NUMBER } },
+                properties: {
+                  maxHealth: { type: Type.INTEGER },
+                  stamina: { type: Type.INTEGER },
+                  speed: { type: Type.NUMBER },
+                  gravity: { type: Type.NUMBER }
+                },
                 required: ["maxHealth", "stamina", "speed", "gravity"]
               },
               power: {
                 type: Type.OBJECT,
-                properties: { name: { type: Type.STRING }, type: { type: Type.STRING }, projectileColor: { type: Type.STRING }, damage: { type: Type.INTEGER }, cooldown: { type: Type.INTEGER }, energyCost: { type: Type.INTEGER } },
-                required: ["name", "type", "projectileColor", "damage", "cooldown", "energyCost"]
-              },
-              fightingStyle: {
-                type: Type.OBJECT,
-                properties: { name: { type: Type.STRING }, comboChain: { type: Type.ARRAY, items: { type: Type.STRING } }, damageMultiplier: { type: Type.NUMBER } },
-                required: ["name", "comboChain", "damageMultiplier"]
+                properties: {
+                  name: { type: Type.STRING, description: "Action power name, e.g., 'Web-Pull' or 'Batarang Toss'" },
+                  type: { type: Type.STRING, description: "Must be: 'projectile', 'pull', 'beam', 'blast', 'dash'" },
+                  projectileColor: { type: Type.STRING },
+                  damage: { type: Type.INTEGER },
+                  cooldown: { type: Type.INTEGER },
+                  soundPitch: { type: Type.INTEGER }
+                },
+                required: ["name", "type", "projectileColor", "damage", "cooldown"]
               }
             },
-            required: ["id", "name", "description", "alignment", "primaryColor", "accentColor", "headColor", "gloveColor", "feetColor", "hasCape", "hasCowlEars", "chestLogo", "emblemColor", "equipmentSlots", "stats", "power", "fightingStyle"]
+            required: [
+              "id", "name", "description", "primaryColor", "accentColor", "headColor",
+              "gloveColor", "feetColor", "hasCape", "hasCowlEars", "chestLogo",
+              "emblemColor", "stats", "power"
+            ]
           }
         }
       });
-      res.json(JSON.parse(response.text?.trim() || "{}"));
-    } catch (err: any) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to generate superhero", message: err.message });
-    }
-  });
 
-  // Dynamic Taunt / Lore Generator
-  app.post("/api/gemini/generate-taunt", async (req, res) => {
-    const { character, context } = req.body;
-    try {
-      const prompt = `Generate a short, intense mid-match fighting game taunt for ${character} ${context ? "in the context of " + context : ""}. Keep it under 20 words. Do not use quotes.`;
-      const response = await ai.models.generateContent({
-        model: "gemini-3.7-flash",
-        contents: prompt
-      });
-      res.json({ taunt: response.text?.trim() });
-    } catch (err: any) {
-      console.error("Gemini taunt generation failed:", err);
-      res.status(500).json({ error: "Failed to generate taunt." });
-    }
-  });
-
-  // Deep GitHub Open-Source Search
-  app.post("/api/search-github", async (req, res) => {
-      const { query } = req.body;
-      try {
-          const fetchRes = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}+in:readme+in:description+stars:>10&per_page=5`);
-          const data = await fetchRes.json();
-          res.json({ results: data.items || [] });
-      } catch (e: any) {
-          res.status(500).json({ error: "GitHub search failed" });
+      const generatedText = response.text;
+      if (!generatedText) {
+        throw new Error("No text response received from Gemini.");
       }
+
+      const parsedConfig = JSON.parse(generatedText.trim());
+      res.json(parsedConfig);
+    } catch (err: any) {
+      console.error("Gemini superhero generation failed:", err);
+      res.status(500).json({ 
+        error: "Failed to generate superhero details via Gemini API.", 
+        message: err.message || err 
+      });
+    }
   });
 
   // Vite middleware for development HMR & asset loading

@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "ingest": "tsx src/backend/auto_ingest.ts",
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
@@ -13,19 +14,23 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
-    "@google/genai": "^1.29.0",
+    "@google/genai": "^2.18.0",
+    "@octokit/rest": "^22.0.1",
     "@tailwindcss/vite": "^4.1.14",
     "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^5.0.4",
     "crawlee": "^3.18.1",
     "dotenv": "^17.2.3",
     "express": "^4.22.2",
+    "firebase": "^12.18.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "nipplejs": "^1.0.4",
     "playwright": "^1.62.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "three": "^0.184.0",
+    "three-mesh-bvh": "^0.9.14",
     "vite": "^6.2.3"
   },
   "devDependencies": {

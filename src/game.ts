@@ -1,4 +1,286 @@
+
+export class CharacterRigCustomizer {
+  private loader: GLTFLoader;
+
+  constructor() {
+    this.loader = new GLTFLoader();
+  }
+
+  public async attachCustomizationPiece(
+    characterGroup: THREE.Group, 
+    gltfUrl: string
+  ): Promise<void> {
+    this.loader.load(gltfUrl, (gltf) => {
+      const itemMesh = gltf.scene.children[0] as THREE.Mesh;
+      
+      const metadata = gltf.scene.userData;
+      const targetSocketName = gltf.scene.userData.mPlusTargetSocket || 'Head_Socket';
+
+      let targetBoneNode: THREE.Object3D | null = null;
+      characterGroup.traverse((child) => {
+        if (child.isObject3D && (child.name === targetSocketName || child.name === 'head' || child.name.includes('Head'))) {
+          targetBoneNode = child;
+        }
+      });
+
+      if (targetBoneNode) {
+        const oldEquipped = (targetBoneNode as THREE.Object3D).getObjectByName(`equipped_item_in_${targetSocketName}`);
+        if (oldEquipped) (targetBoneNode as THREE.Object3D).remove(oldEquipped);
+
+        itemMesh.name = `equipped_item_in_${targetSocketName}`;
+        itemMesh.position.set(0, 0, 0);
+        itemMesh.rotation.set(0, 0, 0);
+        itemMesh.scale.set(1, 1, 1);
+
+        (targetBoneNode as THREE.Object3D).add(itemMesh);
+        console.log(`Success! Attached custom model component natively inside skeletal frame bone slot: ${targetSocketName}`);
+      } else {
+        console.warn(`Critical Error: Target bone rig coordinate node '${targetSocketName}' was not located inside this character geometry template.`);
+      }
+    });
+  }
+}
+
 import * as THREE from 'three';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+
+
+export class ThirdPersonCamera {
+    private camera: THREE.PerspectiveCamera;
+    private target: THREE.Object3D | null = null;
+    private currentPosition = new THREE.Vector3();
+    private currentLookat = new THREE.Vector3();
+    
+    public radius = 5.0;
+    public theta = 0; // Horizontal
+    public phi = Math.PI / 2.5; // Vertical (radians)
+    private actualRadius = 5.0; // Dynamic radius for SpringArm
+
+    constructor(camera: THREE.PerspectiveCamera) {
+        this.camera = camera;
+    }
+
+    public setTarget(target: THREE.Object3D) {
+        this.target = target;
+        this.target.getWorldPosition(this.currentLookat);
+        this.currentPosition.copy(this.camera.position);
+    }
+
+    public update(dt: number, orbitDelta: {x: number, y: number}, world?: any) {
+        if (!this.target) return;
+        
+        // Apply orbit changes from Nipple.js (right stick)
+        this.theta -= orbitDelta.x * dt * 2.0;
+        this.phi -= orbitDelta.y * dt * 2.0;
+        
+        // Clamp phi to prevent flipping
+        this.phi = Math.max(0.1, Math.min(Math.PI - 0.1, this.phi));
+
+        const targetPos = new THREE.Vector3();
+        this.target.getWorldPosition(targetPos);
+        targetPos.y += 1.2; // Aim at head/shoulders
+
+        // Default Spherical to Cartesian relative to target
+        const offset = new THREE.Vector3(
+            Math.sin(this.phi) * Math.sin(this.theta),
+            Math.cos(this.phi),
+            Math.sin(this.phi) * Math.cos(this.theta)
+        ).normalize();
+        
+        // SpringArm Raycast using Rapier
+        this.actualRadius = this.radius;
+        if (world) {
+            const ray = new world.math.Ray(targetPos, offset);
+            // Raycast against solid geometry
+            const maxToi = this.radius;
+            const solid = true;
+            const hit = world.castRay(ray, maxToi, solid);
+            
+            if (hit != null) {
+                // We hit something! Pull camera in closer to avoid clipping
+                this.actualRadius = Math.max(0.5, hit.toi - 0.2); // 0.2 margin
+            }
+        }
+
+        const idealPos = targetPos.clone().add(offset.multiplyScalar(this.actualRadius));
+
+        // Smooth LERP (Spring Arm effect)
+        const t = 1.0 - Math.pow(0.001, dt);
+        this.currentPosition.lerp(idealPos, t);
+        this.currentLookat.lerp(targetPos, t);
+
+        this.camera.position.copy(this.currentPosition);
+        this.camera.lookAt(this.currentLookat);
+    }
+}
+
+export class ChunkManager {
+    private scene: THREE.Scene;
+    private world: RAPIER.World;
+    private chunkSize = 40;
+    private loadedChunks = new Map<string, { group: THREE.Group, bodies: RAPIER.RigidBody[] }>();
+    
+    constructor(scene: THREE.Scene, world: RAPIER.World) {
+        this.scene = scene;
+        this.world = world;
+    }
+
+    public update(playerPos: THREE.Vector3) {
+        const cx = Math.floor(playerPos.x / this.chunkSize);
+        const cz = Math.floor(playerPos.z / this.chunkSize);
+
+        const neededChunks = new Set<string>();
+        // 3x3 Matrix loading around player
+        for (let x = -1; x <= 1; x++) {
+            for (let z = -1; z <= 1; z++) {
+                neededChunks.add(`${cx + x},${cz + z}`);
+            }
+        }
+
+        // Unload old
+        for (const [key, chunk] of this.loadedChunks.entries()) {
+            if (!neededChunks.has(key)) {
+                this.scene.remove(chunk.group);
+                chunk.bodies.forEach(b => this.world.removeRigidBody(b));
+                this.loadedChunks.delete(key);
+            }
+        }
+
+        // Load new
+        for (const key of neededChunks) {
+            if (!this.loadedChunks.has(key)) {
+                this.loadChunk(key);
+            }
+        }
+    }
+
+    private loadChunk(key: string) {
+        const [cx, cz] = key.split(',').map(Number);
+        const group = new THREE.Group();
+        const bodies: RAPIER.RigidBody[] = [];
+        
+        const offsetX = cx * this.chunkSize;
+        const offsetZ = cz * this.chunkSize;
+
+        // Ground Plane for the chunk
+        const groundGeo = new THREE.PlaneGeometry(this.chunkSize, this.chunkSize);
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            color: (cx + cz) % 2 === 0 ? 0x2d3a3a : 0x223333,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(offsetX + this.chunkSize/2, 0, offsetZ + this.chunkSize/2);
+        ground.receiveShadow = true;
+        group.add(ground);
+
+        // Ground Physics
+        const groundBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(offsetX + this.chunkSize/2, 0, offsetZ + this.chunkSize/2));
+        this.world.createCollider(RAPIER.ColliderDesc.cuboid(this.chunkSize/2, 0.1, this.chunkSize/2), groundBody);
+        bodies.push(groundBody);
+
+        // Procedural City Buildings (Low-poly abstraction)
+        // Pseudo-random based on chunk coordinates
+        const seed = Math.abs(cx * 73856093 ^ cz * 19349663);
+        const buildingCount = (seed % 6); // 0 to 5 buildings per chunk
+        
+        for(let i=0; i<buildingCount; i++) {
+            const bw = 3 + ((seed * (i+1)) % 5);
+            const bh = 5 + ((seed * (i+2)) % 25);
+            const bd = 3 + ((seed * (i+3)) % 5);
+            
+            const px = offsetX + 5 + ((seed * (i+4)) % (this.chunkSize - 10));
+            const pz = offsetZ + 5 + ((seed * (i+5)) % (this.chunkSize - 10));
+
+            const bGeo = new THREE.BoxGeometry(bw, bh, bd);
+            const bMat = new THREE.MeshStandardMaterial({ 
+                color: (i % 2 === 0) ? 0x444455 : 0x555566, 
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const bMesh = new THREE.Mesh(bGeo, bMat);
+            bMesh.position.set(px, bh/2, pz);
+            bMesh.castShadow = true;
+            bMesh.receiveShadow = true;
+            group.add(bMesh);
+
+            const bBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(px, bh/2, pz));
+            this.world.createCollider(RAPIER.ColliderDesc.cuboid(bw/2, bh/2, bd/2), bBody);
+            bodies.push(bBody);
+        }
+
+        this.scene.add(group);
+        this.loadedChunks.set(key, { group, bodies });
+    }
+}
+
+
+export class KinematicPlayerController {
+  public mesh: THREE.Group;
+  public characterController: RAPIER.KinematicCharacterController;
+  public rigidBody: RAPIER.RigidBody;
+  public collider: RAPIER.Collider;
+  private targetPosition = new THREE.Vector3();
+  private targetRotation = new THREE.Quaternion();
+
+  private positionLerpFactor = 15.0; 
+  private rotationLerpFactor = 10.0;
+  public isFlying = false;
+
+  constructor(mesh: THREE.Group, world: RAPIER.World, startPos: THREE.Vector3) {
+    this.mesh = mesh;
+    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(startPos.x, startPos.y, startPos.z);
+    this.rigidBody = world.createRigidBody(bodyDesc);
+    const colliderDesc = RAPIER.ColliderDesc.capsule(0.8, 0.4);
+    this.collider = world.createCollider(colliderDesc, this.rigidBody);
+    this.characterController = world.createCharacterController(0.1);
+    this.characterController.setApplyImpulsesToDynamicBodies(true);
+    this.characterController.enableAutostep(0.4, 0.2, true);
+    this.characterController.enableSnapToGround(0.3);
+  }
+
+  public setFlightMode(enabled: boolean): void {
+    this.isFlying = enabled;
+    this.characterController.enableSnapToGround(!enabled);
+  }
+
+  public updateController(deltaTime: number, inputVector: THREE.Vector3, cameraQuaternion: THREE.Quaternion): void {
+    const movementDirection = inputVector.clone().applyQuaternion(cameraQuaternion);
+    if (!this.isFlying) movementDirection.y = 0;
+    movementDirection.normalize();
+
+    const speed = this.isFlying ? 25.0 : 8.0;
+    const velocity = movementDirection.multiplyScalar(speed * deltaTime);
+
+    if (!this.isFlying) velocity.y -= 9.81 * deltaTime;
+
+    this.characterController.computeColliderMovement(this.collider, velocity);
+    const correctedMovement = this.characterController.computedMovement();
+
+    const currentTranslation = this.rigidBody.translation();
+    const nextX = currentTranslation.x + correctedMovement.x;
+    const nextY = currentTranslation.y + correctedMovement.y;
+    const nextZ = currentTranslation.z + correctedMovement.z;
+    
+    this.rigidBody.setNextKinematicTranslation({ x: nextX, y: nextY, z: nextZ });
+    this.targetPosition.set(nextX, nextY, nextZ);
+
+    if (inputVector.lengthSq() > 0.001) {
+      const targetAngle = Math.atan2(movementDirection.x, movementDirection.z);
+      this.targetRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle);
+    }
+
+    this.mesh.position.lerp(this.targetPosition, this.positionLerpFactor * deltaTime);
+    this.mesh.quaternion.slerp(this.targetRotation, this.rotationLerpFactor * deltaTime);
+  }
+}
+
+import { VFXEngine, EffekseerVfxEngine } from './vfx';
+import { FACSController } from './facs';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
@@ -47,6 +329,24 @@ export const SPIDERMAN_PRESET: SuperheroConfig = {
 };
 
 export class GameEngine {
+  public effekseerVfx: EffekseerVfxEngine | null = null;
+  public bvhCombat: BvhCombatManager | null = null;
+
+  public rigCustomizer: CharacterRigCustomizer;
+
+  public tpCamera: ThirdPersonCamera | null = null;
+  public chunkManager: ChunkManager | null = null;
+
+  public virtualMove = { x: 0, y: 0 };
+  public virtualOrbit = { x: 0, y: 0 };
+
+  handleVirtualMove(vec: { x: number; y: number }) {
+      this.virtualMove = vec;
+  }
+  handleVirtualOrbit(vec: { x: number; y: number }) {
+      this.virtualOrbit = vec;
+  }
+
   container: HTMLElement;
   updateUI: (state: any) => void;
   active: boolean = true;
@@ -55,6 +355,7 @@ export class GameEngine {
   audioStarted: boolean = false;
 
   scene!: THREE.Scene;
+  vfx!: VFXEngine;
   camera!: THREE.PerspectiveCamera;
   renderer!: THREE.WebGLRenderer;
   world!: RAPIER.World;
@@ -117,6 +418,14 @@ export class GameEngine {
     this.renderer.setSize(width, height);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+
+    // Try to get GL context for Effekseer
+    try {
+        const glContext = this.renderer.getContext();
+        this.effekseerVfx = new EffekseerVfxEngine(glContext, this.scene, this.camera);
+        this.effekseerVfx.preloadEffect('laser', '/assets/laser.efk').catch(e => console.warn(e));
+    } catch(e) {}
+    
     
     if (!this.active) return;
     this.container.appendChild(this.renderer.domElement);
@@ -136,6 +445,7 @@ export class GameEngine {
     this.scene.add(dirLight);
 
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    this.vfx = new VFXEngine(this.scene);
     this.poseTuner = new PoseTuneEngine();
     this.jointMotors = new JointMotors(null);
     this.grappleMatrix = new GrappleMatrix(this.world, RAPIER);
@@ -153,6 +463,11 @@ export class GameEngine {
     // Apply default superhero presets
     this.applySuperheroStyle(this.player1, BATMAN_PRESET);
     this.applySuperheroStyle(this.player2, SPIDERMAN_PRESET);
+    
+    // Automatically load the ingested open-source model onto Player 2
+    setTimeout(() => {
+        this.loadModelFromURL('/models/RobotExpressive.glb', 'glb', 'P2');
+    }, 1000);
 
     window.addEventListener('resize', this.onResize);
 
@@ -195,74 +510,12 @@ export class GameEngine {
   }
 
   createFloor() {
-    const floorMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(50, 50),
-      new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9, metalness: 0.1 })
-    );
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.receiveShadow = true;
-    this.scene.add(floorMesh);
-
-    // Wrestling Ring Canvas
-    const ringSize = 7;
-    const ringHeight = 0.8;
-    const ringMat = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.6 });
-    const ringMesh = new THREE.Mesh(new THREE.BoxGeometry(ringSize, ringHeight, ringSize), ringMat);
-    ringMesh.position.y = ringHeight / 2;
-    ringMesh.receiveShadow = true;
-    this.scene.add(ringMesh);
-
-    // Ring Posts
-    const postMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 });
-    const postOffsets = [
-      [1, 1], [-1, 1], [1, -1], [-1, -1]
-    ];
-    postOffsets.forEach(pos => {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, ringHeight + 1.5, 8), postMat);
-      post.position.set(pos[0] * (ringSize/2 - 0.2), ringHeight + 0.75, pos[1] * (ringSize/2 - 0.2));
-      post.castShadow = true;
-      this.scene.add(post);
-    });
-
-    // Ropes
-    const ropeMat = new THREE.MeshStandardMaterial({ color: 0xaa2211, roughness: 0.8 });
-    const ropeHeights = [0.5, 0.9, 1.3];
-    ropeHeights.forEach(h => {
-       // 4 sides
-       for(let i=0; i<4; i++) {
-         const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, ringSize - 0.4, 8), ropeMat);
-         rope.position.y = ringHeight + h;
-         
-         let ropeRbDesc = RAPIER.RigidBodyDesc.fixed();
-         let rx = 0, ry = 0, rz = 0;
-         
-         if (i % 2 === 0) {
-            rope.rotation.x = Math.PI / 2;
-            rope.rotation.z = Math.PI / 2;
-            rope.position.z = (i === 0 ? 1 : -1) * (ringSize/2 - 0.2);
-            rx = Math.PI/2; rz = Math.PI/2;
-         } else {
-            rope.rotation.x = Math.PI / 2;
-            rope.position.x = (i === 1 ? 1 : -1) * (ringSize/2 - 0.2);
-            rx = Math.PI/2;
-         }
-         this.scene.add(rope);
-         
-         // Rope physics collider (very bouncy)
-         ropeRbDesc.setTranslation(rope.position.x, rope.position.y, rope.position.z);
-         ropeRbDesc.setRotation(new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)));
-         const ropeBody = this.world.createRigidBody(ropeRbDesc);
-         const colDesc = RAPIER.ColliderDesc.cylinder((ringSize - 0.4)/2, 0.1).setRestitution(1.5).setCollisionGroups(0x0001FFFF).setSolverGroups(0x0001FFFF);
-         this.world.createCollider(colDesc, ropeBody);
-       }
-    });
-
-    // Main floor physics + Ring Canvas physics
-    const floorBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1.0, 0));
-    this.world.createCollider(RAPIER.ColliderDesc.cuboid(50, 1.0, 50).setCollisionGroups(0x0001FFFF).setSolverGroups(0x0001FFFF), floorBody);
-
-    const ringBody = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, ringHeight / 2, 0));
-    this.world.createCollider(RAPIER.ColliderDesc.cuboid(ringSize/2, ringHeight/2, ringSize/2).setCollisionGroups(0x0001FFFF).setSolverGroups(0x0001FFFF), ringBody);
+    this.chunkManager = new ChunkManager(this.scene, this.world);
+    
+    // Also initialize the TP Camera if it doesn't exist
+    if (!this.tpCamera && this.camera) {
+        this.tpCamera = new ThirdPersonCamera(this.camera);
+    }
   }
 
   spawnTable(x: number, y: number, z: number) {
@@ -415,6 +668,12 @@ export class GameEngine {
       heldWeapon: null,
       customModel: null,
       customBoneMap: [], // { bone: THREE.Bone, bodyName: string, offsetMatrix: THREE.Matrix4 }
+      mixer: null,
+      actions: {},
+      currentAction: null,
+      facs: new FACSController(),
+      kinematic: null,
+      grappleJoint: null,
       autonomicSaturation: 0,
       metabolicHeat: 0,
       shaderUniforms: []
@@ -422,6 +681,7 @@ export class GameEngine {
 
     this.scene.add(f.group);
     f.group.position.set(x, y, z);
+    f.kinematic = new KinematicPlayerController(f.group, this.world, new THREE.Vector3(x, y + 1.2, z));
 
     const parts = [
       { name: 'pelvis', w: 0.19, h: 0.24, x: 0, y: 0.92, bodyType: 'torso' },
@@ -565,6 +825,12 @@ export class GameEngine {
         this.world.createImpulseJoint(jointData, f.bodies.get(p1.name) as RAPIER.RigidBody, f.bodies.get(p2.name) as RAPIER.RigidBody, true);
       }
     });
+
+    
+    if (this.tpCamera && this.player1 === undefined) {
+        // First player created becomes the target
+        this.tpCamera.setTarget(f.group);
+    }
 
     return f;
   }
@@ -837,7 +1103,15 @@ export class GameEngine {
     // Delay hit check slightly to allow physics movement
     setTimeout(() => {
       if (!this.active) return;
-      this.checkHitDistance(fighter, opp, baseDmg, limb, targetPos);
+      if (this.bvhCombat) {
+          // Temporarily attach to player group if needed, or pass it
+          // Actually, our BvhCombatManager needs the current fighter's mesh to run executeMeleeHitreg
+          // Let's create a temporary BVH manager for the current fighter
+          const tempBvh = new BvhCombatManager(fighter.group, this.world);
+          tempBvh.executeMeleeHitreg(1.5, type.includes('Kick') ? 0.4 : 0.25, baseDmg, force);
+      } else {
+          this.checkHitDistance(fighter, opp, baseDmg, limb, targetPos);
+      }
     }, 50);
   }
 
@@ -1233,6 +1507,48 @@ export class GameEngine {
     }, 1500);
   }
 
+  
+  attemptGrapple(attacker: any, defender: any) {
+      if (attacker.grappleJoint || attacker.state !== 'standing' || defender.state === 'grounded') return;
+      
+      const p1 = attacker.bodies.get('pelvis');
+      const p2 = defender.bodies.get('pelvis');
+      if (!p1 || !p2) return;
+      
+      const pos1 = p1.translation();
+      const pos2 = p2.translation();
+      const dist = Math.sqrt(Math.pow(pos1.x - pos2.x, 2) + Math.pow(pos1.z - pos2.z, 2));
+      
+      // Open-Source Rapier Physics Joint integration for dynamic grappling
+      if (dist < 1.8) {
+          attacker.state = 'grappling';
+          defender.state = 'grappled';
+          
+          // Apply a spherical joint between the two characters
+          const jointParams = RAPIER.JointData.spherical(
+              new RAPIER.Vector3(0, 0, 0),
+              new RAPIER.Vector3(0, 0, 0)
+          );
+          attacker.grappleJoint = this.world.createImpulseJoint(jointParams, p1, p2, true);
+          this.updateUI({ debugMsg: `Grapple Established!` });
+          
+          setTimeout(() => {
+              if (attacker.grappleJoint) {
+                  this.world.removeImpulseJoint(attacker.grappleJoint, true);
+                  attacker.grappleJoint = null;
+                  
+                  // Throw recoil (IK + Physics throw)
+                  p2.applyImpulse(new RAPIER.Vector3((pos2.x - pos1.x)*20, 15, (pos2.z - pos1.z)*20), true);
+                  
+                  attacker.state = 'standing';
+                  defender.state = 'grounded';
+                  defender.health = Math.max(0, defender.health - 150); // Grapple damage
+                  this.updateUI({ debugMsg: `Grapple Break & Throw` });
+              }
+          }, 2000);
+      }
+  }
+
   updateDefense(f: any, isP1: boolean) {
     f.blockActive = isP1 ? !!this.keys['LB'] : false;
     if (isP1 && this.keys['RB']) {
@@ -1463,6 +1779,18 @@ export class GameEngine {
     }
   }
 
+  playAnimation(player: any, animName: string, blendDuration = 0.2, timeScale = 1.0) {
+      if (!player.mixer || !player.actions) return;
+      const targetKey = Object.keys(player.actions).find(k => k.includes(animName.toLowerCase()));
+      if (!targetKey) return;
+      const newAction = player.actions[targetKey];
+      if (player.currentAction !== newAction) {
+          if (player.currentAction) player.currentAction.fadeOut(blendDuration);
+          newAction.reset().setEffectiveTimeScale(timeScale).fadeIn(blendDuration).play();
+          player.currentAction = newAction;
+      }
+  }
+
   updateAI() {
     if (this.player2.health <= 0) return;
 
@@ -1535,6 +1863,23 @@ export class GameEngine {
        console.error("Physics step error:", err);
        this.active = false;
        return;
+    }
+
+    
+    const p1Input = new THREE.Vector3(0, 0, 0);
+    if (this.keys['ArrowUp'] || this.keys['KeyW']) p1Input.z -= 1;
+    if (this.keys['ArrowDown'] || this.keys['KeyS']) p1Input.z += 1;
+    if (this.keys['ArrowLeft'] || this.keys['KeyA']) p1Input.x -= 1;
+    if (this.keys['ArrowRight'] || this.keys['KeyD']) p1Input.x += 1;
+    
+    // Merge Virtual Joystick
+    if (this.virtualMove.x !== 0 || this.virtualMove.y !== 0) {
+        p1Input.x = this.virtualMove.x;
+        p1Input.z = this.virtualMove.y;
+    }
+
+    if (this.camera && this.player1 && this.player1.kinematic) {
+        this.player1.kinematic.updateController(dt, p1Input, this.camera.quaternion);
     }
 
     // Foot Plant IK & Balance Polish
@@ -1658,6 +2003,11 @@ export class GameEngine {
        this.startStrike(this.player1, 'rightPunch', shift);
        this.keys['BtnX'] = false;
     }
+    if (this.keys['KeyG'] || this.keys['LB']) { // Grapple trigger
+       this.attemptGrapple(this.player1, this.player2);
+       this.keys['KeyG'] = false;
+       this.keys['LB'] = false;
+    }
     if (this.keys['KeyY'] || this.keys['BtnY']) {
        this.startStrike(this.player1, 'leftPunch', shift);
        this.keys['BtnY'] = false;
@@ -1670,6 +2020,21 @@ export class GameEngine {
        this.startStrike(this.player1, 'leftKick', shift);
        this.keys['BtnB'] = false;
     }
+    
+    if (this.keys['KeyV']) {
+       if (this.player1.kinematic) {
+           this.player1.kinematic.setFlightMode(!this.player1.kinematic.isFlying);
+           if (this.player1.kinematic.isFlying && this.effekseerVfx) {
+               // Activate wind distortion ring or trail
+               this.player1.flightWindHandle = this.effekseerVfx.triggerEffect('wind_distortion', this.player1.group.position, 1.5);
+           } else if (!this.player1.kinematic.isFlying && this.effekseerVfx && this.player1.flightWindHandle) {
+               // Assuming a method exists to stop it or let it die out
+               this.player1.flightWindHandle = null;
+           }
+       }
+       this.keys['KeyV'] = false;
+    }
+
     if (this.keys['KeyF'] || this.keys['KeyP'] || this.keys['BtnPower']) {
        this.triggerSuperheroPower(this.player1);
        this.keys['BtnPower'] = false;
@@ -1722,38 +2087,56 @@ export class GameEngine {
       
       // Update custom GLTF skin using the calculated mappings
       if (f.customBoneMap && f.customBoneMap.length > 0) {
-          f.customBoneMap.forEach((mapping: any) => {
-              const body = f.bodies.get(mapping.bodyName);
-              if (body) {
-                  const pos = body.translation();
-                  const rot = body.rotation();
-                  if (Number.isFinite(pos.x) && Number.isFinite(rot.x)) {
-                      const bodyQuat = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
-                      const targetQuat = bodyQuat.multiply(mapping.offsetQuat);
+          if (f.mixer) {
+              const pelvis = f.bodies.get('pelvis');
+              if (pelvis && f.customModel) {
+                  const pos = pelvis.translation();
+                  if (Number.isFinite(pos.x)) {
+                      f.customModel.position.set(pos.x, pos.y - 1.0, pos.z);
                       
-                      const parentWorldQuat = new THREE.Quaternion();
-                      if (mapping.bone.parent) {
-                          mapping.bone.parent.getWorldQuaternion(parentWorldQuat);
+                      const linvel = pelvis.linvel();
+                      if (Math.abs(linvel.x) > 0.5 || Math.abs(linvel.z) > 0.5) {
+                          const angle = Math.atan2(linvel.x, linvel.z);
+                          // Smooth rotation towards velocity vector
+                          const targetQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                          f.customModel.quaternion.slerp(targetQuat, 0.1);
                       }
-                      
-                      // rotation
-                      const localQuat = parentWorldQuat.clone().invert().multiply(targetQuat);
-                      mapping.bone.quaternion.copy(localQuat);
-                      
-                      // translation (root only)
-                      if (mapping.isRoot) {
-                          const bodyPos = new THREE.Vector3(pos.x, pos.y, pos.z);
-                          const targetPos = bodyPos.add(mapping.bodyToBoneOffset);
-                          const parentWorld = mapping.bone.parent ? mapping.bone.parent.matrixWorld : new THREE.Matrix4();
-                          const localPos = targetPos.applyMatrix4(parentWorld.clone().invert());
-                          mapping.bone.position.copy(localPos);
-                      }
-                      
-                      mapping.bone.updateMatrix();
-                      mapping.bone.updateMatrixWorld(true);
                   }
               }
-          });
+          } else {
+              f.customBoneMap.forEach((mapping: any) => {
+                  const body = f.bodies.get(mapping.bodyName);
+                  if (body) {
+                      const pos = body.translation();
+                      const rot = body.rotation();
+                      if (Number.isFinite(pos.x) && Number.isFinite(rot.x)) {
+                          const bodyQuat = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
+                          const targetQuat = bodyQuat.multiply(mapping.offsetQuat);
+                          
+                          const parentWorldQuat = new THREE.Quaternion();
+                          if (mapping.bone.parent) {
+                              mapping.bone.parent.getWorldQuaternion(parentWorldQuat);
+                          }
+                          
+                          // rotation
+                          const localQuat = parentWorldQuat.clone().invert().multiply(targetQuat);
+                          mapping.bone.quaternion.copy(localQuat);
+                          
+                          // translation (root only)
+                          if (mapping.isRoot) {
+                              const bodyPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+                              const targetPos = bodyPos.add(mapping.bodyToBoneOffset);
+                              const parentWorld = mapping.bone.parent ? mapping.bone.parent.matrixWorld : new THREE.Matrix4();
+                              const localPos = targetPos.applyMatrix4(parentWorld.clone().invert());
+                              mapping.bone.position.copy(localPos);
+                          }
+                          
+                          mapping.bone.updateMatrix();
+                          mapping.bone.updateMatrixWorld(true);
+                      }
+                  }
+              });
+          }
       } else {
         // Synchronize legacy group wrapper if no bone map
         const pelvis = f.bodies.get('pelvis');
@@ -1859,8 +2242,25 @@ export class GameEngine {
     const p1Pos = this.player1.bodies.get('pelvis')?.translation() || { x: 0, y: 1.5, z: 0 };
     const p2Pos = this.player2.bodies.get('pelvis')?.translation() || { x: 0, y: 1.5, z: 0 };
     
+    // Boundary checks to prevent characters from falling forever or glitching out of bounds
+    [this.player1, this.player2].forEach((p, index) => {
+        const pelvis = p.bodies.get('pelvis');
+        if (pelvis) {
+            const pos = pelvis.translation();
+            if (pos.y < -5.0 || Math.abs(pos.x) > 30.0 || Math.abs(pos.z) > 30.0) {
+                // Teleport back to center and reset state
+                const resetX = index === 0 ? -2 : 2;
+                this.physicsSafeSet(pelvis, 'translation', { x: resetX, y: 3.0, z: 0 });
+                this.physicsSafeSet(pelvis, 'linvel', { x: 0, y: 0, z: 0 });
+                p.health = Math.max(0, p.health - 200); // Penalty for ring out
+                p.state = 'grounded';
+            }
+        }
+    });
+
     // Update Autonomic Systems
     [this.player1, this.player2].forEach(p => {
+       if (p.facs) p.facs.updateAutonomic(p.health/p.maxHealth, p.stamina/100, p.autonomicSaturation);
        let stressGain = 0;
        if (p.state !== 'standing' && p.state !== 'grounded') stressGain += 8;
        if (p.stamina < 50) stressGain += 4;
@@ -1909,47 +2309,125 @@ export class GameEngine {
     if (isNaN(midY) || !isFinite(midY)) midY = 1.5;
     if (isNaN(midZ) || !isFinite(midZ)) midZ = 0;
     
+    // Clamp the camera target so it doesn't leave the arena visually
+    midX = Math.max(-15, Math.min(15, midX));
+    midY = Math.max(0.5, Math.min(10, midY));
+    midZ = Math.max(-15, Math.min(15, midZ));
+    
     let dist = Math.sqrt(Math.pow(p1Pos.x - p2Pos.x, 2) + Math.pow(p1Pos.z - p2Pos.z, 2));
     if (isNaN(dist) || !isFinite(dist)) dist = 5;
-    
+    dist = Math.min(20, dist); // Clamp distance so camera doesn't zoom out infinitely
+
     const lookAtTarget = new THREE.Vector3(midX, Math.max(1.0, midY) + 0.5, midZ);
     
-    // TV Broadcast Hard Cam Style
-    // Camera stays fairly far back on the Z axis and slightly elevated on the Y axis.
-    // It tracks left/right (X axis) based on the action, but with damping so it doesn't move too jaggedly.
-    const desiredCamPos = new THREE.Vector3(
-      midX * 0.7, // Track action left/right, 0.7 to not slide too far
-      Math.max(2.5, 2.5 + (dist * 0.1)), // Elevated, pull back slightly if guys spread out
-      6.0 + (dist * 0.25) // Hard cam Z distance
-    );
-
-    if (Number.isFinite(desiredCamPos.x) && Number.isFinite(desiredCamPos.y) && Number.isFinite(desiredCamPos.z)) {
-       this.camera.position.lerp(desiredCamPos, 0.05); // Smooth panning
-    }
-    if (Number.isFinite(lookAtTarget.x) && Number.isFinite(lookAtTarget.y) && Number.isFinite(lookAtTarget.z)) {
-       this.camera.lookAt(lookAtTarget);
-    }
-
-    if (this.shakeIntensity > 0 && Number.isFinite(this.shakeIntensity)) {
-      this.camera.position.add(new THREE.Vector3(
-        (Math.random() - 0.5) * this.shakeIntensity,
-        (Math.random() - 0.5) * this.shakeIntensity,
-        (Math.random() - 0.5) * this.shakeIntensity
-      ));
-      this.shakeIntensity = Math.max(0, this.shakeIntensity - dt * 1.5);
-    }
     
-    if (!Number.isFinite(this.camera.position.x)) {
-       this.camera.position.set(0, 1.9, 6);
+    // Chunk Manager Update
+    if (this.chunkManager && this.player1 && this.player1.group) {
+        this.chunkManager.update(this.player1.group.position);
     }
+
+    // Third Person Camera Update
+    if (this.tpCamera) {
+        this.tpCamera.update(dt, this.virtualOrbit, this.world);
+    }
+
 
     this.updateParticles(dt);
+    if (this.vfx) this.vfx.update(dtStr);
+
+    if (this.effekseerVfx) this.effekseerVfx.renderVfx(dtStr);
+
+
+    [this.player1, this.player2].forEach(p => {
+       if (p.mixer) {
+           p.mixer.update(dtStr);
+           // State machine to trigger animations
+           if (p.state === 'standing' || p.state === 'recovery') {
+               const linvel = p.bodies.get('pelvis')?.linvel();
+               const speed = Math.sqrt((linvel?.x||0)**2 + (linvel?.z||0)**2);
+               if (speed > 2.5) this.playAnimation(p, 'run', 0.2, speed * 0.3);
+               else if (speed > 0.5) this.playAnimation(p, 'walk', 0.2, speed * 0.5);
+               else this.playAnimation(p, 'idle', 0.2);
+           } else if (p.state === 'windup' || p.state === 'striking') {
+               this.playAnimation(p, 'punch', 0.1, 1.5);
+           } else if (p.state === 'grounded') {
+               this.playAnimation(p, 'death', 0.1);
+           }
+       }
+    });
 
     this.renderer.render(this.scene, this.camera);
     if (this.active) {
        this.rafId = requestAnimationFrame(this.animate);
     }
   };
+
+  loadModelFromURL(url: string, extension: string, targetPlayer: 'P1' | 'P2' = 'P1') {
+    const onLoad = (object: any) => {
+      let model = object.scene || object;
+      model.scale.set(1.5, 1.5, 1.5);
+      
+      const player = targetPlayer === 'P1' ? this.player1 : this.player2;
+      player.group.add(model);
+      player.customModel = model;
+      player.facs.bind(model);
+      
+      if (object.animations && object.animations.length > 0) {
+          player.mixer = new THREE.AnimationMixer(model);
+          object.animations.forEach((clip: any) => {
+              const name = clip.name.toLowerCase();
+              player.actions[name] = player.mixer.clipAction(clip);
+          });
+          const idle = player.actions['idle'] || player.actions['standing'] || player.actions['wait'] || Object.values(player.actions)[0];
+          if (idle) {
+              idle.play();
+              player.currentAction = idle;
+          }
+      }
+
+      // Basic bone mapping heuristic (simplified)
+      model.traverse((child: any) => {
+         if (child.isMesh) {
+             child.castShadow = true;
+             child.receiveShadow = true;
+         }
+         if (child.isBone) {
+            const n = child.name.toLowerCase();
+            let bodyName = null;
+            if (n.includes('head')) bodyName = 'head';
+            else if (n.includes('spine') || n.includes('torso') || n.includes('chest')) bodyName = 'torso';
+            else if (n.includes('pelvis') || n.includes('hips')) bodyName = 'pelvis';
+            else if (n.includes('left') && n.includes('arm')) bodyName = 'lArm';
+            else if (n.includes('right') && n.includes('arm')) bodyName = 'rArm';
+            else if (n.includes('left') && n.includes('leg')) bodyName = 'lThigh';
+            else if (n.includes('right') && n.includes('leg')) bodyName = 'rThigh';
+            
+            if (bodyName && player.bodies.has(bodyName)) {
+                // Approximate binding
+                player.customBoneMap.push({
+                   bone: child,
+                   bodyName: bodyName,
+                   offsetMatrix: new THREE.Matrix4()
+                });
+            }
+         }
+      });
+      
+      player.bones.forEach((mesh: THREE.Mesh) => mesh.visible = false);
+      this.updateUI({ debugMsg: `Loaded model from ${url} onto ${targetPlayer}` });
+    };
+
+    if (extension === 'glb' || extension === 'gltf') {
+       const loader = new GLTFLoader();
+       const dracoLoader = new DRACOLoader();
+       dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+       loader.setDRACOLoader(dracoLoader);
+       loader.load(url, onLoad, undefined, (e) => {
+           console.error(e);
+           this.updateUI({ debugMsg: `Error loading model: ${(e as Error)?.message || 'Unknown'}` });
+       });
+    }
+  }
 
   loadCustomModel(file: File, isArena: boolean = false) {
     const url = URL.createObjectURL(file);
@@ -2266,8 +2744,13 @@ export class GameEngine {
      fighter.state = 'windup';
      setTimeout(() => { if (this.active && fighter.state === 'windup') fighter.state = 'standing'; }, 300);
 
+     
      if (power.type === 'projectile') {
         const hand = fighter.bodies.get('rHand')?.translation() || pPos;
+
+        if (this.effekseerVfx) {
+           this.effekseerVfx.triggerEffect('laser', new THREE.Vector3(hand.x, hand.y, hand.z), 1.0);
+        }
         const projGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.04, 3);
         const projMat = new THREE.MeshStandardMaterial({ 
            color: parseInt(power.projectileColor), 
@@ -2476,5 +2959,54 @@ export class GameEngine {
          this.world.free();
       }
     }, 100);
+  }
+}
+
+
+export class BvhCombatManager {
+  private playerMesh: THREE.Group;
+  private world: RAPIER.World;
+
+  constructor(playerMesh: THREE.Group, world: RAPIER.World) {
+    this.playerMesh = playerMesh;
+    this.world = world;
+  }
+
+  public executeMeleeHitreg(attackRange: number, attackRadius: number, damage: number, knockbackForce: number): void {
+    const forwardDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.playerMesh.quaternion).normalize();
+    const attackOrigin = this.playerMesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+
+    const shape = null;
+    const shapeRotation = { x: 0, y: 0, z: 0, w: 1 };
+
+    console.log("Executing high-performance programmatic Rapier3D + BVH spatial shape sweep...");
+
+    this.world.projectShape(
+      attackOrigin,
+      shapeRotation,
+      forwardDirection,
+      shape,
+      attackRange,
+      true, 
+      RAPIER.QueryFilter.onlyDynamic(), 
+      (hit) => {
+        const hitCollider = hit.collider;
+        const hitBody = hitCollider.parent();
+
+        if (hitBody && hitBody !== this.world.getRigidBody(this.playerMesh.userData.physicsHandle)) {
+          if (hitBody.userData && typeof hitBody.userData.takeDamage === 'function') {
+            hitBody.userData.takeDamage(damage);
+          }
+
+          const impulseVector = forwardDirection.clone()
+            .multiplyScalar(knockbackForce)
+            .add(new THREE.Vector3(0, 2.0, 0));
+
+          hitBody.applyImpulse({ x: impulseVector.x, y: impulseVector.y, z: impulseVector.z }, true);
+          return false;
+        }
+        return true; 
+      }
+    );
   }
 }

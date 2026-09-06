@@ -1,121 +1,128 @@
 const fs = require('fs');
-
 let code = fs.readFileSync('src/App.tsx', 'utf8');
 
-// 1. Add savedHeroes and currentHeroConfig states
-const stateTarget = "const [activeTab, setActiveTab] = useState<'gemini' | 'gltf'>('gemini');";
-const stateInsert = `const [activeTab, setActiveTab] = useState<'gemini' | 'gltf'>('gemini');
-  const [savedHeroes, setSavedHeroes] = useState<any[]>([]);
-  const [currentHeroConfig, setCurrentHeroConfig] = useState<any | null>(null);
+const nippleImport = `import nipplejs from 'nipplejs';\n`;
+if (!code.includes("import nipplejs")) {
+    code = code.replace("import React,", nippleImport + "import React,");
+}
+
+const overlayCode = `
+interface MobileGamepadProps {
+  onMove: (vector: { x: number; y: number }) => void;
+  onCameraOrbit: (vector: { x: number; y: number }) => void;
+  onPowerWheelTap: () => void;
+}
+const MobileGamepadOverlay: React.FC<MobileGamepadProps> = ({ onMove, onCameraOrbit, onPowerWheelTap }) => {
+  const leftJoystickZone = useRef<HTMLDivElement>(null);
+  const rightJoystickZone = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('bannon_saved_heroes');
-    if (stored) {
-      try {
-        setSavedHeroes(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse Neural Archives:', e);
-      }
-    }
-  }, []);
+    if (!leftJoystickZone.current || !rightJoystickZone.current) return;
 
-  const handleSaveHero = () => {
-    if (!currentHeroConfig) return;
-    const updated = [...savedHeroes];
-    // Avoid duplicates by name
-    if (!updated.find(h => h.name === currentHeroConfig.name)) {
-      updated.push(currentHeroConfig);
-      setSavedHeroes(updated);
-      localStorage.setItem('bannon_saved_heroes', JSON.stringify(updated));
-    }
-  };`;
-code = code.replace(stateTarget, stateInsert);
+    const leftManager = nipplejs.create({
+      zone: leftJoystickZone.current,
+      mode: 'static',
+      position: { left: '80px', bottom: '80px' },
+      color: '#ffffff',
+      size: 110,
+    });
 
-// 2. Capture currentHeroConfig in handleGenerateHero
-const genSuccessTarget = `      const superheroConfig = await response.json();
-      
-      // Apply configuration to the engine`;
-const genSuccessInsert = `      const superheroConfig = await response.json();
-      setCurrentHeroConfig(superheroConfig);
-      
-      // Apply configuration to the engine`;
-code = code.replace(genSuccessTarget, genSuccessInsert);
+    leftManager.on('move', (_, data) => {
+      if (data.vector) onMove({ x: data.vector.x, y: -data.vector.y });
+    });
+    leftManager.on('end', () => onMove({ x: 0, y: 0 }));
 
-// 3. Capture currentHeroConfig in suggestion shortcut
-const shortcutTarget = `const superheroConfig = await response.json();
-                            if (targetPlayer === 'P1') {`;
-const shortcutInsert = `const superheroConfig = await response.json();
-                            setCurrentHeroConfig(superheroConfig);
-                            if (targetPlayer === 'P1') {`;
-code = code.replace(shortcutTarget, shortcutInsert);
+    const rightManager = nipplejs.create({
+      zone: rightJoystickZone.current,
+      mode: 'static',
+      position: { right: '80px', bottom: '80px' },
+      color: '#ffffff',
+      size: 110,
+    });
 
-// 4. Inject the Save UI and the Neural Archives list in the Active Fighter Diagnostics section
-const diagnosticsTarget = `{/* Display Current Active Specs */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg space-y-2">
-                  <div className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest">Active Fighter Diagnostics</div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
-                    <div className="bg-zinc-900 p-1.5 rounded text-zinc-400">
-                      P1: <strong className="text-white">{uiState.player1Name}</strong>
+    rightManager.on('move', (_, data) => {
+      if (data.vector) onCameraOrbit({ x: data.vector.x, y: data.vector.y });
+    });
+
+    return () => {
+      leftManager.destroy();
+      rightManager.destroy();
+    };
+  }, [onMove, onCameraOrbit]);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none select-none z-40">
+      <div ref={leftJoystickZone} className="absolute bottom-0 left-0 w-1/2 h-1/2 pointer-events-auto" />
+      <div ref={rightJoystickZone} className="absolute bottom-0 right-0 w-1/2 h-1/2 pointer-events-auto" />
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 pointer-events-auto">
+        <button 
+          onClick={onPowerWheelTap}
+          className="w-16 h-16 bg-red-600 active:bg-red-800 text-white font-bold rounded-full shadow-lg border-2 border-white flex items-center justify-center transform active:scale-95 transition-all"
+        >
+          M+
+        </button>
+      </div>
+    </div>
+  );
+};
+`;
+
+if (!code.includes("MobileGamepadOverlay")) {
+    code = code.replace("export default function App() {", overlayCode + "\nexport default function App() {");
+}
+
+const renderOverlay = `          <MobileGamepadOverlay 
+            onMove={(vec) => { if(engineRef.current) engineRef.current.handleVirtualMove(vec); }} 
+            onCameraOrbit={(vec) => { if(engineRef.current) engineRef.current.handleVirtualOrbit(vec); }}
+            onPowerWheelTap={() => alert('M+ Power Wheel Opened!')}
+          />`;
+
+if (!code.includes("MobileGamepadOverlay onMove")) {
+    // Add inside the return, maybe near the top of the absolute container
+    code = code.replace("{/* Header overlay */}", renderOverlay + "\n          {/* Header overlay */}");
+}
+
+const currentHeroConfigUI = `                  {currentHeroConfig && (
+                    <div className="mt-2 text-[10px] text-indigo-200 bg-indigo-950/50 p-2 rounded border border-indigo-900/50">
+                      <div><strong className="text-white">Generated:</strong> {currentHeroConfig.name}</div>
+                      <div className="opacity-80 italic">"{currentHeroConfig.description}"</div>
+                      <div className="mt-1 flex gap-2">
+                        <span className="bg-indigo-900/80 px-1 rounded text-white">{currentHeroConfig.stats.maxHealth} HP</span>
+                        <span className="bg-emerald-900/80 px-1 rounded text-white">{currentHeroConfig.stats.speed}x SPD</span>
+                      </div>
                     </div>
-                    <div className="bg-zinc-900 p-1.5 rounded text-zinc-400">
-                      P2: <strong className="text-white">{uiState.player2Name}</strong>
-                    </div>
-                  </div>
-                </div>`;
+                  )}`;
 
-const diagnosticsInsert = `{/* Display Current Active Specs */}
-                <div className="bg-zinc-900/40 border border-zinc-800/80 p-3 rounded-lg space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest">Active Fighter Diagnostics</div>
-                    {currentHeroConfig && (
-                      <button 
-                        onClick={handleSaveHero}
-                        className="px-2 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-800/60 text-emerald-400 text-[9px] font-bold uppercase rounded transition-all active:scale-95"
-                      >
-                        Save to Neural Archive
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
-                    <div className="bg-zinc-900 p-1.5 rounded text-zinc-400">
-                      P1: <strong className="text-white">{uiState.player1Name}</strong>
+const newHeroConfigUI = `                  {currentHeroConfig && (
+                    <div className="mt-2 text-[10px] text-indigo-200 bg-indigo-950/50 p-2 rounded border border-indigo-900/50">
+                      <div><strong className="text-white">Generated:</strong> {currentHeroConfig.name}</div>
+                      <div className="opacity-80 italic">"{currentHeroConfig.description}"</div>
+                      <div className="mt-1 flex gap-2 flex-wrap">
+                        <span className="bg-indigo-900/80 px-1 rounded text-white">{currentHeroConfig.alignment || 'Hero'}</span>
+                        <span className="bg-emerald-900/80 px-1 rounded text-white">{currentHeroConfig.fightingStyle?.name || 'Brawler'} Style</span>
+                        <span className="bg-rose-900/80 px-1 rounded text-white">{currentHeroConfig.power?.name || 'Strike'}</span>
+                      </div>
                     </div>
-                    <div className="bg-zinc-900 p-1.5 rounded text-zinc-400">
-                      P2: <strong className="text-white">{uiState.player2Name}</strong>
-                    </div>
-                  </div>
-                </div>
+                  )}`;
 
-                {/* Neural Archives (Saved Heroes) */}
-                {savedHeroes.length > 0 && (
-                  <div className="space-y-1.5 mt-2">
-                    <div className="text-[10px] font-mono font-bold text-emerald-500 uppercase tracking-widest flex items-center justify-between">
-                      <span>Neural Archives</span>
-                      <span className="text-zinc-600">Local Persistence</span>
+if (code.includes(currentHeroConfigUI)) {
+    code = code.replace(currentHeroConfigUI, newHeroConfigUI);
+} else {
+    // It might not exactly match. Let's do a targeted replace for currentHeroConfig UI
+    const targetDivStart = `{currentHeroConfig && (`;
+    const replaceDiv = `{currentHeroConfig && (
+                    <div className="mt-2 text-[10px] text-indigo-200 bg-indigo-950/50 p-2 rounded border border-indigo-900/50">
+                      <div><strong className="text-white">Generated:</strong> {currentHeroConfig.name}</div>
+                      <div className="opacity-80 italic">"{currentHeroConfig.description}"</div>
+                      <div className="mt-1 flex gap-2 flex-wrap">
+                        <span className="bg-indigo-900/80 px-1 rounded text-white">{currentHeroConfig.alignment || 'Hero'}</span>
+                        <span className="bg-emerald-900/80 px-1 rounded text-white">{currentHeroConfig.fightingStyle?.name || 'Brawler'} Style</span>
+                        <span className="bg-rose-900/80 px-1 rounded text-white">{currentHeroConfig.power?.name || 'Strike'}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                      {savedHeroes.map((hero, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setCurrentHeroConfig(hero);
-                            if (targetPlayer === 'P1') {
-                              engineRef.current?.applySuperheroStyle(engineRef.current.player1, hero);
-                            } else {
-                              engineRef.current?.applySuperheroStyle(engineRef.current.player2, hero);
-                            }
-                          }}
-                          className="px-2.5 py-1 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 hover:border-emerald-700/50 rounded text-[10px] font-mono text-emerald-400 transition-all active:scale-95 flex items-center gap-1"
-                        >
-                          <svg className="w-2.5 h-2.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"></path></svg>
-                          {hero.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}`;
+                  )}`;
+    code = code.replace(/\{currentHeroConfig && \([\s\S]*?\}\)/, replaceDiv);
+}
 
-code = code.replace(diagnosticsTarget, diagnosticsInsert);
-
-fs.writeFileSync('src/App.tsx', code, 'utf8');
-console.log("App.tsx patched with localStorage save/load logic!");
+fs.writeFileSync('src/App.tsx', code);
+console.log("Patched App.tsx for NippleJS and Hero Config");

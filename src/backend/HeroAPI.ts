@@ -1,15 +1,14 @@
 import express from 'express';
 import { WikiScraperEngine, FHeroStatsPayload } from './WikiScraperEngine';
 
-const app = express();
-const port = 3001; // Internal port for the backend
+export const heroRouter = express.Router();
 
 const scraperEngine = new WikiScraperEngine();
 
 // Simple in-memory cache simulating Redis
 const localCache = new Map<string, FHeroStatsPayload>();
 
-app.get('/v1/hero/:name', async (req, res) => {
+heroRouter.get('/hero/:name', async (req, res) => {
     const heroName = req.params.name;
     
     // 1. Check Cache
@@ -43,8 +42,4 @@ app.get('/v1/hero/:name', async (req, res) => {
     }
 });
 
-export function startHeroAPI() {
-    app.listen(port, () => {
-        console.log(`[Hero API] Bannon Engine Node.js Data Router listening on port ${port}`);
-    });
-}
+// Router exported above

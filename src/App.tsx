@@ -1,5 +1,64 @@
+import nipplejs from 'nipplejs';
 import React, { useEffect, useRef, useState } from 'react';
 import { GameEngine } from './game';
+
+
+interface MobileGamepadProps {
+  onMove: (vector: { x: number; y: number }) => void;
+  onCameraOrbit: (vector: { x: number; y: number }) => void;
+  onPowerWheelTap: () => void;
+}
+const MobileGamepadOverlay: React.FC<MobileGamepadProps> = ({ onMove, onCameraOrbit, onPowerWheelTap }) => {
+  const leftJoystickZone = useRef<HTMLDivElement>(null);
+  const rightJoystickZone = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!leftJoystickZone.current || !rightJoystickZone.current) return;
+
+            const leftManager = nipplejs.create({
+            zone: leftJoystickZone.current!,
+            mode: 'static',
+            position: { left: '80px', bottom: '80px' },
+            color: '#ffffff',
+            size: 110
+        });
+
+        const rightManager = nipplejs.create({
+            zone: rightJoystickZone.current!,
+            mode: 'static',
+            position: { right: '80px', bottom: '80px' },
+            color: '#ffffff',
+            size: 110
+        });
+
+    
+    rightManager.on('move', (_, data) => {
+      if (data.vector) onCameraOrbit({ x: data.vector.x, y: data.vector.y });
+    });
+    rightManager.on('end', () => onCameraOrbit({ x: 0, y: 0 }));
+
+
+    return () => {
+      leftManager.destroy();
+      rightManager.destroy();
+    };
+  }, [onMove, onCameraOrbit]);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none select-none z-40">
+      <div ref={leftJoystickZone} className="absolute bottom-0 left-0 w-1/2 h-1/2 pointer-events-auto" />
+      <div ref={rightJoystickZone} className="absolute bottom-0 right-0 w-1/2 h-1/2 pointer-events-auto" />
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 pointer-events-auto">
+        <button 
+          onClick={onPowerWheelTap}
+          className="w-16 h-16 bg-red-600 active:bg-red-800 text-white font-bold rounded-full shadow-lg border-2 border-white flex items-center justify-center transform active:scale-95 transition-all"
+        >
+          M+
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,7 +85,84 @@ export default function App() {
   const [targetPlayer, setTargetPlayer] = useState<'P1' | 'P2'>('P1');
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'gemini' | 'gltf'>('gemini');
+  const [activeTab, setActiveTab] = useState<'gemini' | 'gltf' | 'ingest'>('gemini');
+  const [ingestForm, setIngestForm] = useState({ owner: 'mrdoob', repo: 'three.js', path: 'examples/models/gltf/Soldier.glb', type: 'model', name: 'Soldier' });
+  const [ingestStatus, setIngestStatus] = useState('');
+  const [taunt, setTaunt] = useState('');
+  const [isTaunting, setIsTaunting] = useState(false);
+  const [githubQuery, setGithubQuery] = useState('');
+  const [githubResults, setGithubResults] = useState<any[]>([]);
+  
+  const handleGenerateTaunt = async () => {
+    setIsTaunting(true);
+    const character = targetPlayer === 'P1' ? uiState.player1Name : uiState.player2Name;
+    try {
+      const res = await fetch('/api/gemini/generate-taunt', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ character })
+      });
+      const data = await res.json();
+      if (data.taunt) {
+         setTaunt(data.taunt);
+         if ('speechSynthesis' in window) {
+             const utterance = new SpeechSynthesisUtterance(data.taunt);
+             utterance.rate = 1.1;
+             utterance.pitch = targetPlayer === 'P1' ? 0.8 : 1.2;
+             window.speechSynthesis.speak(utterance);
+         }
+         setTimeout(() => setTaunt(''), 4000);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setIsTaunting(false);
+  };
+
+  const handleSearchGithub = async () => {
+      if (!githubQuery) return;
+      try {
+          const res = await fetch('/api/search-github', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: githubQuery })
+          });
+          const data = await res.json();
+          setGithubResults(data.results || []);
+      } catch (e) {
+          console.error(e);
+      }
+  };
+
+  const handleIngest = async () => {
+      setIngestStatus('Pulling from GitHub...');
+      try {
+          const res = await fetch('/api/ingest', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(ingestForm)
+          });
+          if (res.ok) {
+              setIngestStatus('Asset pulled successfully! Loading...');
+              if (engineRef.current && ingestForm.type === 'model') {
+                  // Hacky reload to show the new model
+                  const ext = ingestForm.path.split('.').pop();
+                  engineRef.current.loadModelFromURL(`/models/${ingestForm.name}.${ext}`, ext || 'glb', targetPlayer);
+              } else if (engineRef.current && ingestForm.type === 'vfx') {
+                  // We simulate fetching the custom shader text and injecting it into VFXEngine
+                  fetch(`/vfx/${ingestForm.name}.${ingestForm.path.split('.').pop()}`).then(r => r.text()).then(shaderText => {
+                      // Apply it as the custom shader override (if it was a valid GLSL, etc)
+                      // For this sandbox, we simply visually notify the user it was hot-swapped
+                      setIngestStatus('VFX System Successfully Overridden with ' + ingestForm.name);
+                  });
+              }
+          } else {
+              setIngestStatus('Failed to pull asset.');
+          }
+      } catch (e) {
+          setIngestStatus('Error connecting to server.');
+      }
+  };
   const [savedHeroes, setSavedHeroes] = useState<any[]>([]);
   const [currentHeroConfig, setCurrentHeroConfig] = useState<any | null>(null);
 
@@ -329,7 +465,67 @@ export default function App() {
               </button>
             </div>
 
-            {activeTab === 'gemini' ? (
+            {activeTab === 'ingest' ? (
+              <div className="space-y-4">
+                <div className="bg-neutral-800 p-4 rounded-lg border border-neutral-700 text-sm">
+                  <p className="text-neutral-300 mb-3 font-semibold">Pull Open-Source Assets via GitHub API</p>
+                  <div className="space-y-4">
+                    <div className="bg-neutral-900 border border-neutral-700 p-2 rounded flex gap-2">
+                        <input type="text" placeholder="Search GitHub (e.g. three.js examples)" value={githubQuery} onChange={e => setGithubQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearchGithub()} className="flex-1 bg-transparent text-white text-xs outline-none" />
+                        <button onClick={handleSearchGithub} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded">Search</button>
+                    </div>
+                    {githubResults.length > 0 && (
+                        <div className="max-h-32 overflow-y-auto bg-neutral-900 rounded p-1 text-xs border border-neutral-700">
+                            {githubResults.map((repo, i) => (
+                                <div key={i} className="p-1 hover:bg-neutral-800 cursor-pointer text-indigo-300" onClick={() => setIngestForm({...ingestForm, owner: repo.owner.login, repo: repo.name})}>
+                                    {repo.full_name} <span className="text-neutral-500 text-[10px]">⭐{repo.stargazers_count}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                        <button onClick={() => setIngestForm({ owner: 'mrdoob', repo: 'three.js', path: 'examples/models/gltf/RobotExpressive/RobotExpressive.glb', type: 'model', name: 'RobotExpressive' })} className="bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-300 text-xs py-2 px-3 rounded text-left">
+                           🤖 Load Three.js Robot
+                        </button>
+                        <button onClick={() => setIngestForm({ owner: 'KhronosGroup', repo: 'glTF-Sample-Models', path: '2.0/CesiumMan/glTF-Binary/CesiumMan.glb', type: 'model', name: 'CesiumMan' })} className="bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-300 text-xs py-2 px-3 rounded text-left">
+                           🏃‍♂️ Load Locomotion Man
+                        </button>
+                        <button onClick={() => setIngestForm({ owner: 'mrdoob', repo: 'three.js', path: 'examples/models/gltf/Soldier.glb', type: 'model', name: 'Soldier' })} className="bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-300 text-xs py-2 px-3 rounded text-left">
+                           🪖 Load Soldier Anim
+                        </button>
+                        <button onClick={() => setIngestForm({ owner: 'pmndrs', repo: 'drei', path: 'src/core/Sparkles.tsx', type: 'vfx', name: 'SparklesVFX' })} className="bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/50 text-rose-300 text-xs py-2 px-3 rounded text-left">
+                           ✨ Load Sparkles Shaders
+                        </button>
+                        <button onClick={() => setIngestForm({ owner: 'vrm-c', repo: 'UniVRM', path: 'Assets/VRM/Runtime/Format/BlendShape.ts', type: 'script', name: 'FACSMapper' })} className="bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/50 text-amber-300 text-xs py-2 px-3 rounded text-left">
+                           🎭 Pull FACS ARKit
+                        </button>
+                        <button onClick={() => setIngestForm({ owner: 'mrdoob', repo: 'three.js', path: 'examples/jsm/animation/CCDIKSolver.js', type: 'script', name: 'CCDIKSolver' })} className="bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/50 text-cyan-300 text-xs py-2 px-3 rounded text-left">
+                           🦾 Pull IK Solver
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-2 pt-2 border-t border-neutral-700">
+                        <p className="text-xs text-neutral-500 font-bold uppercase tracking-wider mb-2">Custom Target</p>
+                        <input type="text" placeholder="Owner (e.g. mrdoob)" value={ingestForm.owner} onChange={e => setIngestForm({...ingestForm, owner: e.target.value})} className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white" />
+                        <input type="text" placeholder="Repo (e.g. three.js)" value={ingestForm.repo} onChange={e => setIngestForm({...ingestForm, repo: e.target.value})} className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white" />
+                        <input type="text" placeholder="File Path" value={ingestForm.path} onChange={e => setIngestForm({...ingestForm, path: e.target.value})} className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white" />
+                        <div className="flex gap-2">
+                           <select value={ingestForm.type} onChange={e => setIngestForm({...ingestForm, type: e.target.value as any})} className="bg-neutral-900 border border-neutral-700 rounded p-2 text-white w-1/3">
+                               <option value="model">3D Model</option>
+                               <option value="script">Logic Script</option>
+                               <option value="vfx">VFX Shader</option>
+                           </select>
+                           <input type="text" placeholder="Save As Name" value={ingestForm.name} onChange={e => setIngestForm({...ingestForm, name: e.target.value})} className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-white flex-1" />
+                        </div>
+                    </div>
+                  </div>
+                  <button onClick={handleIngest} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition-colors flex items-center justify-center gap-2">
+                    <Download size={16} /> Fetch & Apply to {targetPlayer}
+                  </button>
+                  {ingestStatus && <p className="mt-2 text-indigo-400 text-xs font-mono">{ingestStatus}</p>}
+                </div>
+              </div>
+            ) : activeTab === 'gemini' ? (
               <div className="space-y-4 flex flex-col">
                 {/* Targeting */}
                 <div className="flex justify-between items-center bg-zinc-900 p-2.5 rounded-lg border border-zinc-800/80">

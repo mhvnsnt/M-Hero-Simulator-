@@ -1,0 +1,17 @@
+{
+  "users": {
+    "$uid": {
+      "loadouts": {
+        "$loadout_id": {
+          "name": "string",
+          "ragdollStiffness": "number",
+          "ragdollDamping": "number",
+          "swingSpeed": "number",
+          "ropeLength": "number",
+          "attackRange": "number",
+          "updatedAt": "timestamp"
+        }
+      }
+    }
+  }
+}
