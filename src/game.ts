@@ -502,6 +502,31 @@ export class GameEngine {
     this.renderer.setSize(width, height);
   };
 
+  /**
+   * Consecutive world.step() failures. A single bad step (transient wasm
+   * hiccup — observed intermittently in rapier3d-compat 0.19.3) must not
+   * permanently kill the render loop (black viewport). Skip physics for
+   * that frame and keep rendering; only halt after sustained failure,
+   * which indicates persistent world corruption.
+   */
+  private stepFailStreak = 0;
+
+  private stepPhysics(): boolean {
+    try {
+      this.world.step();
+      this.stepFailStreak = 0;
+      return true;
+    } catch (err) {
+      this.stepFailStreak++;
+      console.error(`Physics step error (streak ${this.stepFailStreak}):`, err);
+      if (this.stepFailStreak >= 30) {
+        console.error("Physics persistently failing — halting loop.");
+        this.active = false;
+      }
+      return false;
+    }
+  }
+
   physicsSafeSet(body: any, type: string, val: any) {
     if (!body || !val) return;
     try {
@@ -1868,13 +1893,10 @@ export class GameEngine {
     this.lastTime = time;
     if (isNaN(dt) || !isFinite(dt)) return;
 
-    try {
-       this.world.step();
-    } catch(err) {
-       console.error("Physics step error:", err);
-       this.active = false;
-       return;
-    }
+    // Step physics — stepPhysics() is resilient: a transient step failure
+    // skips physics for that frame instead of killing the render loop.
+    this.stepPhysics();
+    if (!this.active) return;
 
     
     const p1Input = new THREE.Vector3(0, 0, 0);
