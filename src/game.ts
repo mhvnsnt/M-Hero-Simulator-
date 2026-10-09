@@ -103,8 +103,16 @@ export class ThirdPersonCamera {
             const hit = world.castRay(ray, maxToi, solid);
             
             if (hit != null) {
-                // We hit something! Pull camera in closer to avoid clipping
-                this.actualRadius = Math.max(0.5, hit.toi - 0.2); // 0.2 margin
+                // rapier3d-compat 0.19: RayColliderHit carries `timeOfImpact`
+                // (not `toi`). Guard finite — a NaN here used to poison the
+                // camera position and black out the viewport.
+                // Ignore hits within 1m: the ray starts inside the target
+                // fighter's own colliders; those aren't camera obstacles.
+                const toi = (hit as { timeOfImpact?: number }).timeOfImpact;
+                if (Number.isFinite(toi) && (toi as number) > 1.0) {
+                    // We hit something! Pull camera in closer to avoid clipping
+                    this.actualRadius = Math.max(0.5, (toi as number) - 0.2); // 0.2 margin
+                }
             }
         }
 
@@ -271,8 +279,12 @@ export class KinematicPlayerController {
     const nextY = currentTranslation.y + correctedMovement.y;
     const nextZ = currentTranslation.z + correctedMovement.z;
     
-    this.rigidBody.setNextKinematicTranslation({ x: nextX, y: nextY, z: nextZ });
-    this.targetPosition.set(nextX, nextY, nextZ);
+    // Guard: never feed NaN/inf into the physics world — it panics the wasm
+    // ("unreachable") and permanently poisons the world.
+    if (Number.isFinite(nextX) && Number.isFinite(nextY) && Number.isFinite(nextZ)) {
+        this.rigidBody.setNextKinematicTranslation({ x: nextX, y: nextY, z: nextZ });
+        this.targetPosition.set(nextX, nextY, nextZ);
+    }
 
     if (inputVector.lengthSq() > 0.001) {
       const targetAngle = Math.atan2(movementDirection.x, movementDirection.z);
@@ -510,15 +522,17 @@ export class GameEngine {
    * which indicates persistent world corruption.
    */
   private stepFailStreak = 0;
+  private stepFrame = 0;
 
   private stepPhysics(): boolean {
+    this.stepFrame++;
     try {
       this.world.step();
       this.stepFailStreak = 0;
       return true;
     } catch (err) {
       this.stepFailStreak++;
-      console.error(`Physics step error (streak ${this.stepFailStreak}):`, err);
+      console.error(`Physics step error at step #${this.stepFrame} (streak ${this.stepFailStreak}):`, err);
       if (this.stepFailStreak >= 30) {
         console.error("Physics persistently failing — halting loop.");
         this.active = false;
@@ -1881,6 +1895,9 @@ export class GameEngine {
 
   animate = (time: number) => {
     if (!this.active) return;
+    // Schedule the next frame FIRST: no exception thrown below (transient
+    // wasm trap, rapier binding error, etc.) may ever kill the loop silently.
+    this.rafId = requestAnimationFrame(this.animate);
     
     // Safety check - if camera isn't valid, don't try to render
     if (!this.camera || !this.renderer || !this.world || !this.scene) {
@@ -2390,9 +2407,6 @@ export class GameEngine {
     });
 
     this.renderer.render(this.scene, this.camera);
-    if (this.active) {
-       this.rafId = requestAnimationFrame(this.animate);
-    }
   };
 
   loadModelFromURL(url: string, extension: string, targetPlayer: 'P1' | 'P2' = 'P1') {
