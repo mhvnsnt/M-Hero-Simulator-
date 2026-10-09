@@ -10,7 +10,7 @@ export interface SuperheroConfig {
   hasCape: boolean;
   capeColor?: string;
   hasCowlEars: boolean;
-  chestLogo?: 'bat' | 'spider' | 's-shield' | 'star' | 'lightning' | 'none';
+  chestLogo?: 'wings' | 'orb' | 'shield' | 'star' | 'lightning' | 'none';
   emblemColor?: string;
   stats: {
     maxHealth: number;
