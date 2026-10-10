@@ -233,7 +233,7 @@ export function CustomizerPanel({ engine, onClose }: Props) {
                 <option value="">None</option>
                 {(slotManifests[slot] ?? []).map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.name}
+                    {m.label}
                   </option>
                 ))}
               </select>
