@@ -184,6 +184,46 @@ export class CustomizerPreview {
     }
   }
 
+  /** Load a procedural fighter (M-Hero): clone the live visual group, no GLB.
+   * The clone is static (current pose); accessories/morphs apply live. */
+  async loadProceduralFighter(source: THREE.Group, fighterId: string): Promise<void> {
+    const token = ++this.applyToken;
+    this.setStatus({ loading: true, error: null, modelName: fighterId });
+    try {
+      if (this.modelRoot) {
+        disposeFacePaint(this.modelRoot);
+        this.scene.remove(this.modelRoot);
+        this.mixer?.stopAllAction();
+        this.mixer = null;
+      }
+      const root = source.clone(true);
+      (root.userData as Record<string, unknown>).fighterId = fighterId;
+      root.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.castShadow = true;
+          mesh.frustumCulled = true;
+        }
+      });
+      this.modelRoot = root;
+      this.modelFile = fighterId;
+      this.scene.add(root);
+      if (token !== this.applyToken || this.disposed) return;
+      this.centerModel();
+      await this.applyBuild(this.build.fighterId === fighterId ? this.build : defaultBuild(fighterId, ""));
+      if (token !== this.applyToken || this.disposed) return;
+      this.setStatus({ loading: false, error: null, modelName: fighterId });
+    } catch (e) {
+      if (token !== this.applyToken || this.disposed) return;
+      this.setStatus({
+        loading: false,
+        error: `Could not load ${fighterId}`,
+        modelName: null,
+      });
+      console.error("Customizer preview load failed:", e);
+    }
+  }
+
   /** Frame the model: feet at y=0, camera aimed at chest height. */
   private centerModel(): void {
     const root = this.modelRoot;

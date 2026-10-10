@@ -2,6 +2,7 @@ import nipplejs from 'nipplejs';
 import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { GameEngine } from './game';
+import { CustomizerPanel } from './CustomizerPanel';
 
 
 interface MobileGamepadProps {
@@ -71,6 +72,7 @@ export default function App() {
   const engineRef = useRef<GameEngine | null>(null);
 
   const [showMods, setShowMods] = useState(false);
+  const [showCustomizer, setShowCustomizer] = useState(false);
   const [joyState, setJoyState] = useState({ x: 0, y: 0 });
 
   const [uiState, setUiState] = useState({
@@ -418,6 +420,9 @@ export default function App() {
           <div className="flex flex-col items-center">
             <button onClick={() => setShowMods(!showMods)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase rounded shadow-lg pointer-events-auto mb-2 border border-indigo-400">
               Mods / Custom
+            </button>
+            <button onClick={() => setShowCustomizer(true)} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold uppercase rounded shadow-lg pointer-events-auto mb-2 border border-purple-400">
+              Customize Hero
             </button>
             <div className="bg-zinc-900 border border-zinc-700 px-2 py-1 md:px-6 md:py-2 rounded-lg text-sm md:text-2xl font-mono font-bold text-white shadow-xl mb-2">
               TARGET: {uiState.p1Zone.toUpperCase()}
@@ -791,6 +796,14 @@ export default function App() {
         </div>
         
       </div>
+
+      {/* Character Customizer */}
+      {showCustomizer && engineRef.current && (
+        <CustomizerPanel
+          engine={engineRef.current}
+          onClose={() => setShowCustomizer(false)}
+        />
+      )}
     </div>
   );
 }
