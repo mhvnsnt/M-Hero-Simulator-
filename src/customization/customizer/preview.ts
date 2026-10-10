@@ -184,9 +184,10 @@ export class CustomizerPreview {
     }
   }
 
-  /** Load a procedural fighter (M-Hero): clone the live visual group, no GLB.
-   * The clone is static (current pose); accessories/morphs apply live. */
-  async loadProceduralFighter(source: THREE.Group, fighterId: string): Promise<void> {
+  /** Load a procedural fighter (M-Hero): clone the live body-part meshes into
+   * a group for the studio preview. The clone is static (current pose);
+   * accessories/morphs apply live. */
+  async loadProceduralFighter(meshes: THREE.Mesh[], fighterId: string): Promise<void> {
     const token = ++this.applyToken;
     this.setStatus({ loading: true, error: null, modelName: fighterId });
     try {
@@ -196,8 +197,17 @@ export class CustomizerPreview {
         this.mixer?.stopAllAction();
         this.mixer = null;
       }
-      const root = source.clone(true);
+      const root = new THREE.Group();
+      for (const m of meshes) {
+        const c = m.clone();
+        // Preserve the live world transform on the clone.
+        c.position.copy(m.position);
+        c.quaternion.copy(m.quaternion);
+        c.scale.copy(m.scale);
+        root.add(c);
+      }
       (root.userData as Record<string, unknown>).fighterId = fighterId;
+      (root.userData as Record<string, unknown>).customMeshes = [...root.children];
       root.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (mesh.isMesh) {

@@ -253,19 +253,32 @@ export function manifestsForSlot(
 
 /** Find the best attach point for an accessory: exact name -> pattern -> slot fallback.
  * M-Hero adaptation: accepts THREE.Bone OR named meshes (procedural fighters
- * have no skeleton — their body parts are named meshes in a Map). Returns
- * THREE.Object3D; callers use .add() which works on both. */
+ * have no skeleton — their body parts are named meshes). If root.userData
+ * carries customMeshes (M-Hero adapter), those are searched instead of
+ * traversing. Returns THREE.Object3D; callers use .add() which works on both. */
 function findBone(root: THREE.Object3D, want: string, slot: AccessorySlotId): THREE.Object3D | null {
+  const custom = (root.userData as Record<string, unknown>).customMeshes as THREE.Object3D[] | undefined;
   const bones: THREE.Object3D[] = [];
-  root.traverse((o) => {
-    if ((o as THREE.Bone).isBone) bones.push(o);
-  });
-  // Procedural-rig fallback: named meshes (e.g. M-Hero's 'head', 'lHand').
-  // Only used when the model has no bones at all.
-  if (bones.length === 0) {
+  if (custom) {
+    for (const o of custom) {
+      if ((o as THREE.Bone).isBone) bones.push(o);
+    }
+    if (bones.length === 0) {
+      for (const o of custom) {
+        if ((o as THREE.Mesh).isMesh && o.name) bones.push(o);
+      }
+    }
+  } else {
     root.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh && o.name) bones.push(o);
+      if ((o as THREE.Bone).isBone) bones.push(o);
     });
+    // Procedural-rig fallback: named meshes (e.g. M-Hero's 'head', 'lHand').
+    // Only used when the model has no bones at all.
+    if (bones.length === 0) {
+      root.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh && o.name) bones.push(o);
+      });
+    }
   }
   const exact = bones.find((b) => b.name === want);
   if (exact) return exact;

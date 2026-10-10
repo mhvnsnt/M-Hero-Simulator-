@@ -82,17 +82,25 @@ function snapshotBase(root: THREE.Object3D): Map<THREE.Object3D, THREE.Vector3> 
     | undefined;
   if (!base) {
     base = new Map();
-    let hasBones = false;
-    root.traverse((o) => {
-      if ((o as THREE.Bone).isBone) hasBones = true;
-    });
-    root.traverse((o) => {
-      const bone = o as THREE.Bone;
-      // M-Hero: procedural fighters have no bones — snapshot named meshes instead.
-      if (bone.isBone || (!hasBones && (o as THREE.Mesh).isMesh && o.name)) {
-        base!.set(o, o.scale.clone());
+    const custom = (root.userData as Record<string, unknown>).customMeshes as THREE.Object3D[] | undefined;
+    if (custom) {
+      // M-Hero: procedural fighters — snapshot named meshes directly.
+      for (const o of custom) {
+        if ((o as THREE.Mesh).isMesh && o.name) base.set(o, o.scale.clone());
       }
-    });
+    } else {
+      let hasBones = false;
+      root.traverse((o) => {
+        if ((o as THREE.Bone).isBone) hasBones = true;
+      });
+      root.traverse((o) => {
+        const bone = o as THREE.Bone;
+        // M-Hero: procedural fighters have no bones — snapshot named meshes instead.
+        if (bone.isBone || (!hasBones && (o as THREE.Mesh).isMesh && o.name)) {
+          base!.set(o, o.scale.clone());
+        }
+      });
+    }
     (root.userData as Record<string, unknown>)[BASE_KEY] = base;
   }
   return base;
@@ -150,18 +158,25 @@ function reground(root: THREE.Object3D): void {
 /** Which morph dials actually found bones (or named meshes, M-Hero) on this model. */
 export function supportedMorphs(root: THREE.Object3D): MorphKey[] {
   const bones: string[] = [];
-  let hasBones = false;
-  root.traverse((o) => {
-    if ((o as THREE.Bone).isBone) {
-      hasBones = true;
-      bones.push(o.name);
+  const custom = (root.userData as Record<string, unknown>).customMeshes as THREE.Object3D[] | undefined;
+  if (custom) {
+    for (const o of custom) {
+      if (o.name) bones.push(o.name);
     }
-  });
-  // M-Hero: procedural fighters — match morph patterns against mesh names.
-  if (!hasBones) {
+  } else {
+    let hasBones = false;
     root.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh && o.name) bones.push(o.name);
+      if ((o as THREE.Bone).isBone) {
+        hasBones = true;
+        bones.push(o.name);
+      }
     });
+    // M-Hero: procedural fighters — match morph patterns against mesh names.
+    if (!hasBones) {
+      root.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh && o.name) bones.push(o.name);
+      });
+    }
   }
   return MORPH_DEFS.filter((def) =>
     def.bones.some(({ pattern }) => bones.some((n) => pattern.test(n))),

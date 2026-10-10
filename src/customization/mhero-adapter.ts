@@ -39,9 +39,27 @@ export interface FighterCapabilities {
   notes: string[];
 }
 
-/** The THREE root the suite customizes. */
+/** The THREE root the suite customizes.
+ * M-Hero's fighter meshes live flat in the scene (not under f.group), so we
+ * provide a persistent Group per fighter whose userData.customMeshes lists
+ * the body-part meshes. The suite's finders check this first. */
+const rootCache = new WeakMap<FighterLike, THREE.Group>();
 export function fighterRoot(f: FighterLike): THREE.Group {
-  return f.group;
+  let root = rootCache.get(f);
+  if (!root) {
+    root = new THREE.Group();
+    root.name = `customizer-root`;
+    rootCache.set(f, root);
+  }
+  (root.userData as Record<string, unknown>).customMeshes = [...f.bones.values()];
+  (root.userData as Record<string, unknown>).fighterId =
+    f.superheroConfig?.name ?? "fighter";
+  return root;
+}
+
+/** Meshes for building a preview clone. */
+export function fighterMeshes(f: FighterLike): THREE.Mesh[] {
+  return [...f.bones.values()];
 }
 
 export function getFighterCapabilities(f: FighterLike): FighterCapabilities {

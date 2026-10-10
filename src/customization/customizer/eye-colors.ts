@@ -62,7 +62,7 @@ function isMeshStandardMaterial(
 export function findIrisMaterials(root: THREE.Object3D): IrisMat[] {
   const found: IrisMat[] = [];
   const seen = new Set<THREE.Material>();
-  root.traverse((o) => {
+  const check = (o: THREE.Object3D) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).filter(
@@ -77,7 +77,14 @@ export function findIrisMaterials(root: THREE.Object3D): IrisMat[] {
         found.push(mat as IrisMat);
       }
     }
-  });
+  };
+  // M-Hero: check adapter-provided meshes first.
+  const custom = (root.userData as Record<string, unknown>).customMeshes as THREE.Object3D[] | undefined;
+  if (custom) {
+    custom.forEach(check);
+  } else {
+    root.traverse(check);
+  }
   return found;
 }
 

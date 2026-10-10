@@ -27,6 +27,8 @@ import {
 } from "./customization/customizer/persistence";
 import {
   applyBuildToFighter,
+  fighterMeshes,
+  fighterRoot,
   getFighterCapabilities,
   manifestsBySlot,
   type FighterLike,
@@ -82,9 +84,9 @@ export function CustomizerPanel({ engine, onClose }: Props) {
       if (cancelled) return;
       setSlotManifests(bySlot);
       const f = fighterIdx === 0 ? engine.player1 : engine.player2;
-      const root = f.group;
+      const root = fighterRoot(f);
       setCaps(getFighterCapabilities(f));
-      await preview.loadProceduralFighter(root, fighterIdx === 0 ? "p1" : "p2");
+      await preview.loadProceduralFighter(fighterMeshes(f), fighterIdx === 0 ? "p1" : "p2");
       if (cancelled) return;
       const saved = await loadBuild(fighterIdx === 0 ? "p1" : "p2");
       const b = saved ?? defaultBuild(fighterIdx === 0 ? "p1" : "", "");
