@@ -1,0 +1,140 @@
+[
+  {
+    "asset": "street",
+    "file": "street_L.glb",
+    "attachBone": "mixamorig:LeftHand",
+    "bones": [
+      "mixamorig:LeftHand",
+      "mixamorig:LeftForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "gloves"
+  },
+  {
+    "asset": "street",
+    "file": "street_R.glb",
+    "attachBone": "mixamorig:RightHand",
+    "bones": [
+      "mixamorig:RightHand",
+      "mixamorig:RightForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "gloves"
+  },
+  {
+    "asset": "boxing",
+    "file": "boxing_L.glb",
+    "attachBone": "mixamorig:LeftHand",
+    "bones": [
+      "mixamorig:LeftHand",
+      "mixamorig:LeftForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Boxing/MMA roster.",
+    "category": "gloves"
+  },
+  {
+    "asset": "boxing",
+    "file": "boxing_R.glb",
+    "attachBone": "mixamorig:RightHand",
+    "bones": [
+      "mixamorig:RightHand",
+      "mixamorig:RightForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Boxing/MMA roster.",
+    "category": "gloves"
+  },
+  {
+    "asset": "mma",
+    "file": "mma_L.glb",
+    "attachBone": "mixamorig:LeftHand",
+    "bones": [
+      "mixamorig:LeftHand",
+      "mixamorig:LeftForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Boxing/MMA roster.",
+    "category": "gloves"
+  },
+  {
+    "asset": "mma",
+    "file": "mma_R.glb",
+    "attachBone": "mixamorig:RightHand",
+    "bones": [
+      "mixamorig:RightHand",
+      "mixamorig:RightForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Boxing/MMA roster.",
+    "category": "gloves"
+  },
+  {
+    "asset": "opera_theory",
+    "file": "opera_theory_L.glb",
+    "attachBone": "mixamorig:LeftHand",
+    "bones": [
+      "mixamorig:LeftHand",
+      "mixamorig:LeftForeArm",
+      "mixamorig:LeftArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "CANON: Theory attire-2 long gloves.",
+    "category": "gloves"
+  },
+  {
+    "asset": "opera_theory",
+    "file": "opera_theory_R.glb",
+    "attachBone": "mixamorig:RightHand",
+    "bones": [
+      "mixamorig:RightHand",
+      "mixamorig:RightForeArm",
+      "mixamorig:RightArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "CANON: Theory attire-2 long gloves.",
+    "category": "gloves"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "asset": "hair_echo_long_green",
+    "file": "public/models/hair/hair_echo_long_green.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Echo long green hair (quaternius Hair_Long, CC0, recolored vivid green). Height-blended head/neck/spine2 weights for springbones."
+  },
+  {
+    "asset": "hair_static_blond_beard",
+    "file": "public/models/hair/hair_static_blond_beard.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Static white-blond shoulder-length hair + matching beard (quaternius Hair_Long + Hair_Beard, CC0, recolored)."
+  },
+  {
+    "asset": "hair_hollow_long_black",
+    "file": "public/models/hair/hair_hollow_long_black.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Hollow long black hair (quaternius Hair_Long, CC0, recolored black). Worn under/with the Super Dragon lucha mask."
+  },
+  {
+    "asset": "hair_theory_locs_beads",
+    "file": "public/models/hair/hair_theory_locs_beads.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Theory medium locs with beads (toon dread ponytail, CC0 tiko479, recolored dark brown; brass beads at loc tips)."
+  },
+  {
+    "asset": "hair_theory_locs_pinned",
+    "file": "public/models/hair/hair_theory_locs_pinned.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Theory short twisted locs pinned up (procedural, 15 twisted tapered locs swept up/back from the crown)."
+  }
+]

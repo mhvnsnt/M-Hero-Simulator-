@@ -1,0 +1,146 @@
+[
+  {
+    "asset": "sneaker_high",
+    "file": "sneaker_high_L.glb",
+    "attachBone": "mixamorig:LeftFoot",
+    "bones": [
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:LeftLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "footwear"
+  },
+  {
+    "asset": "sneaker_high",
+    "file": "sneaker_high_R.glb",
+    "attachBone": "mixamorig:RightFoot",
+    "bones": [
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase",
+      "mixamorig:RightLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "footwear"
+  },
+  {
+    "asset": "sneaker_low",
+    "file": "sneaker_low_L.glb",
+    "attachBone": "mixamorig:LeftFoot",
+    "bones": [
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:LeftLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "footwear"
+  },
+  {
+    "asset": "sneaker_low",
+    "file": "sneaker_low_R.glb",
+    "attachBone": "mixamorig:RightFoot",
+    "bones": [
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase",
+      "mixamorig:RightLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "footwear"
+  },
+  {
+    "asset": "wrestling_boot",
+    "file": "wrestling_boot_L.glb",
+    "attachBone": "mixamorig:LeftFoot",
+    "bones": [
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:LeftLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Ring gear.",
+    "category": "footwear"
+  },
+  {
+    "asset": "wrestling_boot",
+    "file": "wrestling_boot_R.glb",
+    "attachBone": "mixamorig:RightFoot",
+    "bones": [
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase",
+      "mixamorig:RightLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Ring gear.",
+    "category": "footwear"
+  },
+  {
+    "asset": "theory_boot",
+    "file": "theory_boot_L.glb",
+    "attachBone": "mixamorig:LeftFoot",
+    "bones": [
+      "mixamorig:LeftFoot",
+      "mixamorig:LeftToeBase",
+      "mixamorig:LeftLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "CANON: Theory knee-high heeled boots.",
+    "category": "footwear"
+  },
+  {
+    "asset": "theory_boot",
+    "file": "theory_boot_R.glb",
+    "attachBone": "mixamorig:RightFoot",
+    "bones": [
+      "mixamorig:RightFoot",
+      "mixamorig:RightToeBase",
+      "mixamorig:RightLeg"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "CANON: Theory knee-high heeled boots.",
+    "category": "footwear"
+  }
+]

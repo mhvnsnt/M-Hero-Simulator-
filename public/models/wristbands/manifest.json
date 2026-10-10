@@ -1,0 +1,98 @@
+[
+  {
+    "asset": "sweatband",
+    "file": "sweatband_L.glb",
+    "attachBone": "mixamorig:LeftForeArm",
+    "bones": [
+      "mixamorig:LeftForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "wristbands"
+  },
+  {
+    "asset": "sweatband",
+    "file": "sweatband_R.glb",
+    "attachBone": "mixamorig:RightForeArm",
+    "bones": [
+      "mixamorig:RightForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street wear.",
+    "category": "wristbands"
+  },
+  {
+    "asset": "wrap",
+    "file": "wrap_L.glb",
+    "attachBone": "mixamorig:LeftForeArm",
+    "bones": [
+      "mixamorig:LeftForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Fight wear.",
+    "category": "wristbands"
+  },
+  {
+    "asset": "wrap",
+    "file": "wrap_R.glb",
+    "attachBone": "mixamorig:RightForeArm",
+    "bones": [
+      "mixamorig:RightForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Fight wear.",
+    "category": "wristbands"
+  },
+  {
+    "asset": "pad",
+    "file": "pad_L.glb",
+    "attachBone": "mixamorig:LeftForeArm",
+    "bones": [
+      "mixamorig:LeftForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Fight wear.",
+    "category": "wristbands"
+  },
+  {
+    "asset": "pad",
+    "file": "pad_R.glb",
+    "attachBone": "mixamorig:RightForeArm",
+    "bones": [
+      "mixamorig:RightForeArm"
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Fight wear.",
+    "category": "wristbands"
+  }
+]

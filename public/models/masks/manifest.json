@@ -1,0 +1,86 @@
+[
+  {
+    "asset": "mask_hollow_superdragon",
+    "file": "public/models/masks/mask_hollow_superdragon.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Hollow Super Dragon-based lucha mask: black full-head shell, white jagged shark-tooth mouth, pointed ear protrusions, blue dragon trim + tassels. OWNER CANON 2026-10-06 \u2014 replaces rejected horned-demon/purple-eyes likeness."
+  },
+  {
+    "asset": "mask_luchador_sombra",
+    "file": "public/models/masks/mask_luchador_sombra.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Sombra Negra lucha libre mask \u2014 'Calculated Mercenary': matte black, silver eye trim, angular brow band. Lucha libre identity."
+  },
+  {
+    "asset": "mask_luchador_crimson",
+    "file": "public/models/masks/mask_luchador_crimson.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Luchador mask variant: crimson shell, gold trim. Roster variant, no canon lock."
+  },
+  {
+    "asset": "mask_luchador_azul",
+    "file": "public/models/masks/mask_luchador_azul.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Luchador mask variant: royal blue shell, white trim. Roster variant, no canon lock."
+  },
+  {
+    "asset": "mask_bandana_black",
+    "file": "public/models/masks/mask_bandana_black.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street bandana: black folded band, knot + tails at back."
+  },
+  {
+    "asset": "mask_bandana_red",
+    "file": "public/models/masks/mask_bandana_red.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street bandana: red folded band, knot + tails at back."
+  },
+  {
+    "asset": "mask_bandana_camo",
+    "file": "public/models/masks/mask_bandana_camo.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Street bandana: woodland camo vertex-color blotches."
+  }
+]
