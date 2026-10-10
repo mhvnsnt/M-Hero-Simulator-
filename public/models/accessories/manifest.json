@@ -1,0 +1,85 @@
+{
+ "$comment": "Accessory manifests for the character customizer (LANE-UI). The four chains ship skinned to Neck/Spine2 bones and ~8x oversize for our fighters, so the customizer rebinds them onto the fighter's matching bones and bakes the manifest 'scale' into the geometry. PENDANT ORIENTATION is the chain lane's tuning knob (branch feature/chain-pendant-fix): use attach.rotation (degrees XYZ, applied to the rebind) \u2014 e.g. Judas's J_Neck maps chain-local +z to world +x, so the pendant currently swings sideways; X~-103 brings it forward-down on Judas rigs. Mixamo necks differ \u2014 tune per rig when the lane lands its fix.",
+ "accessories": [
+  {
+   "attach": {
+    "bone": "Neck",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": 0.15
+   },
+   "file": "models/accessories/chain_gold_ashlane_rigged.glb",
+   "id": "chain_gold_ashlane",
+   "label": "Gold AshLane Chain",
+   "slot": "chain"
+  },
+  {
+   "attach": {
+    "bone": "Neck",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": 0.15
+   },
+   "file": "models/accessories/chain_wizard_gang_rigged.glb",
+   "id": "chain_wizard_gang",
+   "label": "Wizard Gang Chain",
+   "slot": "chain"
+  },
+  {
+   "attach": {
+    "bone": "Neck",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": 0.15
+   },
+   "file": "models/accessories/chain_diamond_ice_rigged.glb",
+   "id": "chain_diamond_ice",
+   "label": "Diamond Ice Chain",
+   "slot": "chain"
+  },
+  {
+   "attach": {
+    "bone": "Neck",
+    "position": [
+     0,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": 0.15
+   },
+   "file": "models/accessories/chain_bannon_piece_rigged.glb",
+   "id": "chain_bannon_piece",
+   "label": "Bannon Jesus Piece",
+   "slot": "chain"
+  }
+ ]
+}

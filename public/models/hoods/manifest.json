@@ -1,0 +1,26 @@
+[
+  {
+    "asset": "hood_purple_robe",
+    "file": "public/models/hoods/hood_purple_robe.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Purple hooded robe hood \u2014 Narrator Ashes purple robe; Theory attire-4 purple hooded robe (worn with THEORY pendant). Deep violet, pointed peak, shoulder drape. Authored in ASTRID space; scale to target head height / 1.5232."
+  },
+  {
+    "asset": "hood_purple_robe_dark",
+    "file": "public/models/hoods/hood_purple_robe_dark.glb",
+    "attachBone": "mixamorig:Head",
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "scale": 1.0,
+    "canonNotes": "Purple hooded robe hood \u2014 dark violet variant for low-light scenes."
+  }
+]
