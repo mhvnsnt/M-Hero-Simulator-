@@ -51,7 +51,7 @@ export function fighterRoot(f: FighterLike): THREE.Group {
     root.name = `customizer-root`;
     rootCache.set(f, root);
   }
-  (root.userData as Record<string, unknown>).customMeshes = [...f.bones.values()];
+  (root.userData as Record<string, unknown>).customMeshes = fighterMeshes(f);
   (root.userData as Record<string, unknown>).fighterId =
     f.superheroConfig?.name ?? "fighter";
   return root;
@@ -59,7 +59,14 @@ export function fighterRoot(f: FighterLike): THREE.Group {
 
 /** Meshes for building a preview clone. */
 export function fighterMeshes(f: FighterLike): THREE.Mesh[] {
-  return [...f.bones.values()];
+  const out: THREE.Mesh[] = [];
+  for (const [name, mesh] of f.bones) {
+    // The game keys meshes by name but never sets mesh.name — do it here
+    // so the suite's name-pattern matching works.
+    if (!mesh.name) mesh.name = name;
+    out.push(mesh);
+  }
+  return out;
 }
 
 export function getFighterCapabilities(f: FighterLike): FighterCapabilities {
