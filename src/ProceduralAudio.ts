@@ -92,7 +92,7 @@ export class ProceduralAudio {
         oscGain.connect(this.ctx.destination);
 
         if (type === 'pull') {
-           // Spider-man Web Zip swoosh frequency sweep
+           // Skyline Zip swoosh frequency sweep
            osc.type = 'triangle';
            osc.frequency.setValueAtTime(pitch, this.ctx.currentTime);
            osc.frequency.exponentialRampToValueAtTime(pitch * 2.5, this.ctx.currentTime + 0.35);
@@ -101,7 +101,7 @@ export class ProceduralAudio {
            osc.start();
            osc.stop(this.ctx.currentTime + 0.35);
         } else if (type === 'projectile') {
-           // Batarang gadget throw whirring sound
+           // Crescent Throw whirring sound
            osc.type = 'sine';
            osc.frequency.setValueAtTime(pitch, this.ctx.currentTime);
            osc.frequency.linearRampToValueAtTime(pitch - 150, this.ctx.currentTime + 0.4);
