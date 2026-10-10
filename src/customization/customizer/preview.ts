@@ -204,6 +204,16 @@ export class CustomizerPreview {
         c.position.copy(m.position);
         c.quaternion.copy(m.quaternion);
         c.scale.copy(m.scale);
+        // Use a clean material (the game's onBeforeCompile shader doesn't
+        // survive the preview renderer) preserving the authored color.
+        const srcMat = m.material as THREE.MeshStandardMaterial;
+        if (srcMat && (srcMat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+          c.material = new THREE.MeshStandardMaterial({
+            color: (srcMat as THREE.MeshStandardMaterial).color.clone(),
+            roughness: 0.6,
+            metalness: 0.1,
+          });
+        }
         root.add(c);
       }
       (root.userData as Record<string, unknown>).fighterId = fighterId;
