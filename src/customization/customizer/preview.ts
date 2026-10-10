@@ -207,13 +207,17 @@ export class CustomizerPreview {
         // Use a clean material (the game's onBeforeCompile shader doesn't
         // survive the preview renderer) preserving the authored color.
         const srcMat = m.material as THREE.MeshStandardMaterial;
-        if (srcMat && (srcMat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-          c.material = new THREE.MeshStandardMaterial({
-            color: (srcMat as THREE.MeshStandardMaterial).color.clone(),
-            roughness: 0.6,
-            metalness: 0.1,
-          });
+        let colorHex = 0x4488ff;
+        if (srcMat && (srcMat as unknown as { isMeshStandardMaterial?: boolean }).isMeshStandardMaterial) {
+          const sc = (srcMat as THREE.MeshStandardMaterial).color;
+          if (sc) colorHex = sc.getHex();
         }
+        // eslint-disable-next-line no-console
+        c.material = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          roughness: 0.6,
+          metalness: 0.1,
+        });
         root.add(c);
       }
       (root.userData as Record<string, unknown>).fighterId = fighterId;
