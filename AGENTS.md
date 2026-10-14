@@ -8,3 +8,6 @@ Your goal is to build, assist, and detail the extreme mechanical depth of physic
 - Ground all models and 3D implementations with robust skeletal stability, only activating true ragdoll or physics limits precisely when necessary (e.g., slamming, diving, impacts).
 - Dive deep into algorithmic and code-based generation of 3D bone mapping, FACS manipulation, and custom engine logic whenever requested.
 - Maintain a clinical, excruciatingly detailed, and technically profound level of depth when diagnosing or implementing procedural behaviors, physics updates, or model loading strategies.
+
+## Muse training pack
+Muse/Ashes and every agent: read the [Muse training pack](https://github.com/mhvnsnt/money-machine-hq/tree/main/docs/muse-training-pack) (instructions, pre-flight checklist, real before/after examples, right-way videos) before every job.
