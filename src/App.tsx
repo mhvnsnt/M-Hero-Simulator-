@@ -1,5 +1,6 @@
 import nipplejs from 'nipplejs';
 import React, { useEffect, useRef, useState } from 'react';
+import { Download } from 'lucide-react';
 import { GameEngine } from './game';
 
 
@@ -32,10 +33,12 @@ const MobileGamepadOverlay: React.FC<MobileGamepadProps> = ({ onMove, onCameraOr
         });
 
     
-    rightManager.on('move', (_, data) => {
+    // nipplejs types only declare the 'pressure' overload — cast for joystick events.
+    const rightOn = rightManager.on.bind(rightManager) as unknown as (ev: string, cb: (...args: any[]) => void) => void;
+    rightOn('move', (_, data) => {
       if (data.vector) onCameraOrbit({ x: data.vector.x, y: data.vector.y });
     });
-    rightManager.on('end', () => onCameraOrbit({ x: 0, y: 0 }));
+    rightOn('end', () => onCameraOrbit({ x: 0, y: 0 }));
 
 
     return () => {
@@ -77,8 +80,8 @@ export default function App() {
     ko: null as string | null,
     debugMsg: 'Init',
     autonomicSaturation: 0,
-    player1Name: 'Batman',
-    player2Name: 'Spider-man'
+    player1Name: 'Nightguard',
+    player2Name: 'Skywire'
   });
 
   const [heroPrompt, setHeroPrompt] = useState('');
@@ -167,7 +170,7 @@ export default function App() {
   const [currentHeroConfig, setCurrentHeroConfig] = useState<any | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('bannon_saved_heroes');
+    const stored = localStorage.getItem('mhero_saved_heroes');
     if (stored) {
       try {
         setSavedHeroes(JSON.parse(stored));
@@ -184,7 +187,7 @@ export default function App() {
     if (!updated.find(h => h.name === currentHeroConfig.name)) {
       updated.push(currentHeroConfig);
       setSavedHeroes(updated);
-      localStorage.setItem('bannon_saved_heroes', JSON.stringify(updated));
+      localStorage.setItem('mhero_saved_heroes', JSON.stringify(updated));
     }
   };
 
@@ -552,7 +555,7 @@ export default function App() {
                   <div className="relative flex items-center">
                     <input 
                       type="text"
-                      placeholder="e.g. Hulk, Iron Man, Superman, Thor..."
+                      placeholder="e.g. Nightguard, Skywire, Golem, Tempest..."
                       value={heroPrompt}
                       onChange={(e) => setHeroPrompt(e.target.value)}
                       disabled={generating}
@@ -579,7 +582,7 @@ export default function App() {
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest">Quick Synthesizer Suggestions</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {['Superman', 'The Hulk', 'Wolverine', 'The Flash', 'Thor', 'Iron Man'].map(name => (
+                    {['Nightguard', 'Skywire', 'Golem', 'Tempest', 'Rook', 'Vigil'].map(name => (
                       <button
                         key={name}
                         onClick={async () => {
