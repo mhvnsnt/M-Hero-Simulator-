@@ -93,7 +93,10 @@ export class ThirdPersonCamera {
         // SpringArm Raycast using Rapier
         this.actualRadius = this.radius;
         if (world) {
-            const ray = new world.math.Ray(targetPos, offset);
+            // FIX 2026-10-09: rapier3d-compat exposes Ray at the module top level,
+            // not on world.math. The old call threw every frame and killed the
+            // render loop (black viewport).
+            const ray = new RAPIER.Ray(targetPos, offset);
             // Raycast against solid geometry
             const maxToi = this.radius;
             const solid = true;
@@ -245,7 +248,9 @@ export class KinematicPlayerController {
 
   public setFlightMode(enabled: boolean): void {
     this.isFlying = enabled;
-    this.characterController.enableSnapToGround(!enabled);
+    // rapier3d-compat 0.19: enableSnapToGround takes a snap distance (number).
+    // Pass 0 while flying to disable ground snapping.
+    this.characterController.enableSnapToGround(enabled ? 0.3 : 0);
   }
 
   public updateController(deltaTime: number, inputVector: THREE.Vector3, cameraQuaternion: THREE.Quaternion): void {
@@ -293,10 +298,16 @@ import { GrappleMatrix } from './physics/GrappleMatrix';
 import { FootPlantIK } from './physics/FootPlantIK';
 import { BalancePolish } from './physics/BalancePolish';
 
-export const BATMAN_PRESET: SuperheroConfig = {
-  id: 'batman',
-  name: 'Batman',
-  description: "Gotham's Dark Knight. Master detective and martial artist with high-tech bat gadgets.",
+/**
+ * Default fighter presets — ORIGINAL placeholder hero identities
+ * (2026-10-09 de-IP pass: borrowed DC/Marvel labels removed per owner
+ * directive). The game's full identity gets defined later; these are clean,
+ * lawful placeholder roster slots only — no invented canon.
+ */
+export const NIGHTGUARD_PRESET: SuperheroConfig = {
+  id: 'nightguard',
+  name: 'Nightguard',
+  description: "Nocturnal street tactician. Heavy tactical armor, a gliding cape, and precision gadgets.",
   primaryColor: '0x2a2a2a',
   accentColor: '0x111111',
   headColor: '0x111111',
@@ -305,16 +316,16 @@ export const BATMAN_PRESET: SuperheroConfig = {
   hasCape: true,
   capeColor: '0x111111',
   hasCowlEars: true,
-  chestLogo: 'bat',
+  chestLogo: 'wings',
   emblemColor: '0xfdd835',
   stats: { maxHealth: 1300, stamina: 110, speed: 1.1, gravity: 1.0 },
-  power: { name: 'Batarang Toss', type: 'projectile', projectileColor: '0x212121', damage: 160, cooldown: 1200, soundPitch: 400 }
+  power: { name: 'Crescent Throw', type: 'projectile', projectileColor: '0x212121', damage: 160, cooldown: 1200, soundPitch: 400 }
 };
 
-export const SPIDERMAN_PRESET: SuperheroConfig = {
-  id: 'spiderman',
-  name: 'Spider-man',
-  description: 'Your Friendly Neighborhood Hero. Shoots webs, zips, and leaps with hyper agile reflexes.',
+export const SKYWIRE_PRESET: SuperheroConfig = {
+  id: 'skywire',
+  name: 'Skywire',
+  description: 'Hyper-agile urban acrobat. Grapple-line zips and aerial agility with quick reflexes.',
   primaryColor: '0xd32f2f',
   accentColor: '0x1565c0',
   headColor: '0xd32f2f',
@@ -322,10 +333,10 @@ export const SPIDERMAN_PRESET: SuperheroConfig = {
   feetColor: '0xd32f2f',
   hasCape: false,
   hasCowlEars: false,
-  chestLogo: 'spider',
+  chestLogo: 'orb',
   emblemColor: '0x111111',
   stats: { maxHealth: 1100, stamina: 140, speed: 1.4, gravity: 0.65 },
-  power: { name: 'Web Zip', type: 'pull', projectileColor: '0xffffff', damage: 120, cooldown: 1800, soundPitch: 750 }
+  power: { name: 'Skyline Zip', type: 'pull', projectileColor: '0xffffff', damage: 120, cooldown: 1800, soundPitch: 750 }
 };
 
 export class GameEngine {
@@ -460,9 +471,9 @@ export class GameEngine {
     this.player1 = this.createFighter(-1.8, 1.0, 0, 0x4488ff, 0x00020005);
     this.player2 = this.createFighter(1.8, 1.0, 0, 0xff4444, 0x00040003);
 
-    // Apply default superhero presets
-    this.applySuperheroStyle(this.player1, BATMAN_PRESET);
-    this.applySuperheroStyle(this.player2, SPIDERMAN_PRESET);
+    // Apply default hero presets (original placeholder identities)
+    this.applySuperheroStyle(this.player1, NIGHTGUARD_PRESET);
+    this.applySuperheroStyle(this.player2, SKYWIRE_PRESET);
     
     // Automatically load the ingested open-source model onto Player 2
     setTimeout(() => {
@@ -1938,7 +1949,7 @@ export class GameEngine {
       this.applyActiveRagdoll(p, p === this.player1);
     });
 
-    // Update active flying projectiles (Batarangs, etc.)
+    // Update active flying projectiles (Crescent throws, etc.)
     for (let i = this.activeProjectiles.length - 1; i >= 0; i--) {
        const proj = this.activeProjectiles[i];
        const pos = proj.body.translation();
@@ -2298,8 +2309,8 @@ export class GameEngine {
       ko: this.player1.health <= 0 ? `${(this.player2.superheroConfig?.name || 'PLAYER 2').toUpperCase()} WINS` : this.player2.health <= 0 ? `${(this.player1.superheroConfig?.name || 'PLAYER 1').toUpperCase()} WINS` : null,
       debugMsg: `FPS:${Math.round(1/dt)} CamX:${this.camera?.position?.x?.toFixed(1)} P1X:${p1Pos.x?.toFixed(1)}`,
       autonomicSaturation: this.player1.autonomicSaturation,
-      player1Name: this.player1.superheroConfig?.name || 'Batman',
-      player2Name: this.player2.superheroConfig?.name || 'Spider-man'
+      player1Name: this.player1.superheroConfig?.name || 'Nightguard',
+      player2Name: this.player2.superheroConfig?.name || 'Skywire'
     });
     
     let midX = (p1Pos.x + p2Pos.x) / 2;
@@ -2669,11 +2680,11 @@ export class GameEngine {
           });
 
           let logoGeo;
-          if (config.chestLogo === 'bat') {
+          if (config.chestLogo === 'wings') {
              logoGeo = new THREE.BoxGeometry(0.24, 0.08, 0.03);
-          } else if (config.chestLogo === 'spider') {
+          } else if (config.chestLogo === 'orb') {
              logoGeo = new THREE.BoxGeometry(0.08, 0.12, 0.03);
-          } else if (config.chestLogo === 's-shield') {
+          } else if (config.chestLogo === 'shield') {
              logoGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.03, 3);
           } else if (config.chestLogo === 'lightning') {
              logoGeo = new THREE.BoxGeometry(0.06, 0.18, 0.03);
@@ -2683,7 +2694,7 @@ export class GameEngine {
 
           const logoMesh = new THREE.Mesh(logoGeo, logoMat);
           logoMesh.position.set(0, 0.05, 0.16);
-          if (config.chestLogo === 's-shield') {
+          if (config.chestLogo === 'shield') {
              logoMesh.rotation.x = Math.PI / 2;
              logoMesh.rotation.z = Math.PI;
           } else if (config.chestLogo === 'lightning') {
@@ -2696,7 +2707,7 @@ export class GameEngine {
     }
 
     // belt
-    if (config.id === 'batman' || config.chestLogo === 'bat') {
+    if (config.id === 'nightguard' || config.chestLogo === 'wings') {
        const pelvisMesh = f.bones.get('pelvis');
        if (pelvisMesh) {
           const beltGeo = new THREE.BoxGeometry(0.25, 0.05, 0.25);
@@ -2710,8 +2721,8 @@ export class GameEngine {
 
     // Force UI state sync
     this.updateUI({
-       player1Name: this.player1.superheroConfig?.name || "Batman",
-       player2Name: this.player2.superheroConfig?.name || "Spider-man",
+       player1Name: this.player1.superheroConfig?.name || "Nightguard",
+       player2Name: this.player2.superheroConfig?.name || "Skywire",
        player1Health: this.player1.health,
        player2Health: this.player2.health
     });
@@ -2973,40 +2984,11 @@ export class BvhCombatManager {
   }
 
   public executeMeleeHitreg(attackRange: number, attackRadius: number, damage: number, knockbackForce: number): void {
-    const forwardDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.playerMesh.quaternion).normalize();
-    const attackOrigin = this.playerMesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-
-    const shape = null;
-    const shapeRotation = { x: 0, y: 0, z: 0, w: 1 };
-
-    console.log("Executing high-performance programmatic Rapier3D + BVH spatial shape sweep...");
-
-    this.world.projectShape(
-      attackOrigin,
-      shapeRotation,
-      forwardDirection,
-      shape,
-      attackRange,
-      true, 
-      RAPIER.QueryFilter.onlyDynamic(), 
-      (hit) => {
-        const hitCollider = hit.collider;
-        const hitBody = hitCollider.parent();
-
-        if (hitBody && hitBody !== this.world.getRigidBody(this.playerMesh.userData.physicsHandle)) {
-          if (hitBody.userData && typeof hitBody.userData.takeDamage === 'function') {
-            hitBody.userData.takeDamage(damage);
-          }
-
-          const impulseVector = forwardDirection.clone()
-            .multiplyScalar(knockbackForce)
-            .add(new THREE.Vector3(0, 2.0, 0));
-
-          hitBody.applyImpulse({ x: impulseVector.x, y: impulseVector.y, z: impulseVector.z }, true);
-          return false;
-        }
-        return true; 
-      }
-    );
+    // NOTE 2026-10-09: stubbed. The rapier3d-compat 0.19 API has no
+    // world.projectShape / RAPIER.QueryFilter, and this method is never
+    // called (GameEngine.bvhCombat is always null; strikes fall back to
+    // checkHitDistance). Re-implement with world.intersectionsWithShape when
+    // the BVH hit-reg path is actually wired up.
+    console.log("executeMeleeHitreg: BVH shape sweep is a stub (unwired).");
   }
 }
